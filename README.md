@@ -10,19 +10,22 @@ This project includes:
 2. **Training/data pipeline work** (same repository) to pair user photos with WHOOP recovery data for experimentation.
 3. **Prompt-first image LLM scoring** as the initial baseline before iterative tuning.
 
-## Local setup
+## Domain language and decisions
 
-1. Copy `.env.example` to `.env`.
-2. Fill in all required values in `.env`.
-3. Keep `.env` local only (it is ignored by git).
+- [`CONTEXT.md`](./CONTEXT.md) is the glossary. Use its terms exactly.
+- [`docs/adr/`](./docs/adr) records why the non-obvious choices were made.
+- [`docs/implementation-plan.md`](./docs/implementation-plan.md) is the v1 build plan.
 
-## Environment variables
+## Configuration
 
-See `.env.example` for all required config and secrets:
+Config is split, and the split matters:
 
-- WHOOP API OAuth credentials and endpoint
-- LLM provider/model/API credentials
-- App environment and local dataset/reporting paths
+- **The iOS app** reads no config files. The OpenRouter key is entered once in Settings and stored
+  in the iOS Keychain. Model, pinned provider and seed are compiled in, and recorded on every
+  Scoring Run.
+- **The Python pipeline** reads `.env` on your Mac. Copy `.env.example` to `.env` and fill it in;
+  `.env` is gitignored. Its `SCORING_*` values must match the app's, or re-scored Signals will not
+  be comparable with the app's.
 
 ## Reporting notes
 
@@ -31,22 +34,17 @@ Add notes for each stage so they can be reused in the academic report.
 
 ## Needs Attention
 
-You need to provide or complete:
+Before the first build can run on a phone:
 
-1. **WHOOP developer credentials**
-   - `WHOOP_CLIENT_ID`
-   - `WHOOP_CLIENT_SECRET`
-   - Confirm `WHOOP_REDIRECT_URI` that your app will use
-2. **LLM credentials**
-   - `LLM_API_KEY`
-   - Confirm provider/model values (`LLM_PROVIDER`, `LLM_MODEL`)
-3. **iOS app identifiers**
-   - `IOS_BUNDLE_ID`
-4. **Local paths**
-   - Confirm where photos should be stored (`PHOTO_STORAGE_DIR`)
-   - Confirm where paired dataset artifacts should be written (`DATASET_OUTPUT_DIR`)
-5. **Manual data preparation**
-   - Upload/select historical face photos you want to use for initial personal training data
-   - Ensure each photo can be associated with a WHOOP recovery value for dataset pairing
-6. **Device testing**
-   - Build and run the app on your iPhone from Xcode on your Mac
+1. **Xcode toolchain** - `xcode-select` currently points at Command Line Tools:
+   `sudo xcode-select -s /Applications/Xcode.app`
+2. **Signing** - sign in with a free Apple ID in Xcode to create a Personal Team.
+   Builds expire after 7 days and must be re-run from Xcode; push notifications and
+   iCloud are unavailable on this tier.
+3. **OpenRouter key** - create one and enter it in the app's Settings screen.
+   Review account-level prompt-logging and training settings before scanning a real face.
+
+For the research strand (not needed for the app):
+
+4. **WHOOP developer credentials** in `.env`.
+5. **Historical photos** to backfill, each associable with a WHOOP Recovery value.

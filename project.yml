@@ -1,0 +1,43 @@
+# Generated project: see docs/implementation-plan.md section 3.
+# The .xcodeproj is NOT committed. Regenerate with: xcodegen generate
+name: FaceRecovery
+
+options:
+  bundleIdPrefix: com.mushfique
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    # Language mode 5 deliberately: SwiftData + strict Swift 6 concurrency adds
+    # sendability friction with no benefit to a single-user, main-actor app.
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: PBKJR4F4ZY
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+targets:
+  FaceRecovery:
+    type: application
+    platform: iOS
+    sources:
+      - path: FaceRecovery
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mushfique.facerecovery
+        PRODUCT_NAME: Face Recovery
+        GENERATE_INFOPLIST_FILE: YES
+        # Portrait only: the framing guide and capture protocol assume one orientation.
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_NSCameraUsageDescription: >-
+          Face Recovery uses the front camera to take your morning face scan.
+          Photos stay on this device except when sent for scoring.
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: >-
+          Face Recovery reads photos you choose in order to backfill past days,
+          using each photo's capture date.
+        TARGETED_DEVICE_FAMILY: "1"

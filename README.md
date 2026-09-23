@@ -48,3 +48,6 @@ For the research strand (not needed for the app):
 
 4. **WHOOP developer credentials** in `.env`.
 5. **Historical photos** to backfill, each associable with a WHOOP Recovery value.
+
+The pipeline itself lives in [`pipeline/`](./pipeline/README.md): WHOOP pull, photo pairing and
+dataset build.

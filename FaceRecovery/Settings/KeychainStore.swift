@@ -12,8 +12,7 @@ enum KeychainStore {
         guard !trimmed.isEmpty else { return delete() }
 
         let query: [String: Any] = [
-            kSecCl
-            ss as String: kSecClassGenericPassword,
+            kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
         ]

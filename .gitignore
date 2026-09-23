@@ -64,3 +64,6 @@ fastlane/test_output
 # Environment files (keep local secrets out of git)
 .env
 .env.local
+
+# XcodeGen generates the project from project.yml; it is not committed.
+*.xcodeproj

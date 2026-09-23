@@ -86,8 +86,8 @@ FaceRecovery/
 }
 
 @Model final class ScoringRun {
-    var provider: String              // "DeepInfra"
-    var modelId: String               // "z-ai/glm-5.3-flash"
+    var provider: String              // "Google AI Studio"
+    var modelId: String               // "google/gemini-3.1-flash-lite"
     var seed: Int
     var promptVersion: String         // "v1"
     var schemaVersion: String         // "v1"
@@ -107,8 +107,8 @@ time, so retuning recomputes history with no re-scoring cost (ADR 0002).
 
 ```json
 {
-  "model": "z-ai/glm-5.3-flash",
-  "provider": { "order": ["DeepInfra"], "allow_fallbacks": false },
+  "model": "google/gemini-3.1-flash-lite",
+  "provider": { "order": ["Google AI Studio"], "allow_fallbacks": false },
   "seed": 42,
   "temperature": 0,
   "response_format": { "type": "json_schema", "json_schema": { "strict": true, "schema": { ... } } },
@@ -122,7 +122,7 @@ time, so retuning recomputes history with no re-scoring cost (ADR 0002).
 Images are downscaled to a 1024px long edge and JPEG-encoded at 0.8 before base64 encoding. At
 roughly $0.0005 per scan this is immaterial to cost; it matters for upload time on cellular.
 
-`allow_fallbacks: false` means a DeepInfra outage fails the scan. That is deliberate (ADR 0001):
+`allow_fallbacks: false` means a Google AI Studio outage fails the scan. That is deliberate (ADR 0001):
 the UI surfaces a retry rather than silently producing a score from a different provider.
 
 ### Response schema (v1)

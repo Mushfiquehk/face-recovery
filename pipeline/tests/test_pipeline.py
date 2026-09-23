@@ -102,7 +102,7 @@ def test_build_end_to_end(cfg):
     scoring.cache_path(cfg, first).write_text(json.dumps({
         "signals": {k: 10 for k, _ in scoring.SIGNALS} | {"holistic_tiredness": 30},
         "capture_quality": {"lighting": 80, "sharpness": 70, "face_fully_visible": True, "usable": True},
-        "scoring_run": {"provider": "CoreWeave", "model_id": "m", "prompt_version": "v1", "schema_version": "v1"},
+        "scoring_run": {"provider": "Google AI Studio", "model_id": "m", "prompt_version": "v1", "schema_version": "v1"},
     }))
 
     manifest = dataset.build(cfg, found, list(BY_SLEEP.values()), SLEEPS)

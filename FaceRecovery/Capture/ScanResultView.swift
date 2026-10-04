@@ -18,6 +18,10 @@ struct ScanResultView: View {
                     moverCard(signal: mover, deviation: score[deviation: mover])
                 }
 
+                card(title: "Journal") {
+                    JournalPanel(dayStart: scan.dayStart)
+                }
+
                 if let signals = scan.signals {
                     card(title: "Signals", subtitle: score?.isBaselineForming == false ? "vs your normal" : nil) {
                         ScanReadingView(signals: signals, score: score)

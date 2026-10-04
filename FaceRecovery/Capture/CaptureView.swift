@@ -5,6 +5,15 @@ struct CaptureView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var camera = CameraController()
     @State private var phase: Phase = .framing
+    @State private var journalPrompt: JournalPrompt?
+    /// The day the journal was last asked for, so a retake that day does not ask again, even
+    /// if the user chose "Not now".
+    @State private var journalAskedOn: Date?
+
+    private struct JournalPrompt: Identifiable {
+        let dayStart: Date
+        var id: Date { dayStart }
+    }
 
     private enum Phase {
         case framing
@@ -31,6 +40,9 @@ struct CaptureView: View {
             }
             .navigationTitle("Scan")
             .navigationBarTitleDisplayMode(.inline)
+        }
+        .fullScreenCover(item: $journalPrompt) { prompt in
+            JournalFlowView(dayStart: prompt.dayStart, existing: nil, isBlindToScore: true)
         }
         .task { await camera.start() }
         .onDisappear { camera.stop() }
@@ -121,10 +133,21 @@ struct CaptureView: View {
                 isDateAdjusted: false,
                 isBackfilled: false
             )
+            askForJournal(on: scan.dayStart)
             await score(scan)
         } catch {
             phase = .framing
         }
+    }
+
+    /// Opens the day's journal over the scan while it scores, so the user says how they feel
+    /// before they see how they look (ADR 0004). Asked once a day, and only if not yet written.
+    private func askForJournal(on dayStart: Date) {
+        guard journalAskedOn != dayStart,
+              JournalEntry.entry(on: dayStart, in: modelContext) == nil
+        else { return }
+        journalAskedOn = dayStart
+        journalPrompt = JournalPrompt(dayStart: dayStart)
     }
 
     private func score(_ scan: FaceScan) async {

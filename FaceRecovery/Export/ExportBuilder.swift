@@ -1,6 +1,7 @@
 import Foundation
 
-/// Writes `export-<date>/` containing `scans.json` and the photo files.
+/// Writes `export-<date>/` containing `scans.json` and the photo files. `scans.json` also
+/// carries every Journal Entry, joined to scans by the local `day` both records share.
 ///
 /// Derived values — Recovery Scores, Personal Baselines — are deliberately not exported. The
 /// Python pipeline recomputes them from the same Absolute Signals, so the app and the analysis
@@ -10,6 +11,7 @@ enum ExportBuilder {
         let exportedAt: Date
         let schemaVersion: String
         let scans: [Record]
+        let journalEntries: [JournalRecord]
     }
 
     struct Record: Encodable {
@@ -40,6 +42,9 @@ enum ExportBuilder {
         }
 
         let id: String
+        /// Local calendar day, `yyyy-MM-dd`. `captured_at` is encoded in UTC, so without this
+        /// the pipeline would have to guess the time zone to find the day a scan belongs to.
+        let day: String
         let capturedAt: Date
         let isDateAdjusted: Bool
         let isBackfilled: Bool
@@ -52,8 +57,24 @@ enum ExportBuilder {
         let scoringRun: Run?
     }
 
+    /// A Journal Entry exactly as the user gave it. Ratings are the 1-5 raw values; skipped
+    /// questions are omitted rather than written as null.
+    struct JournalRecord: Encodable {
+        let day: String
+        let createdAt: Date
+        let updatedAt: Date
+        let isBlindToScore: Bool
+        let perceivedRecovery: Int?
+        let sleepQuality: Int?
+        let hoursSlept: Int?
+        let tookMedication: Bool?
+        let medications: [String]
+        let factors: [String]
+        let notes: String
+    }
+
     /// Builds the export folder and returns its URL, ready for the share sheet.
-    static func build(scans: [FaceScan], now: Date = Date()) throws -> URL {
+    static func build(scans: [FaceScan], journalEntries: [JournalEntry], now: Date = Date()) throws -> URL {
         let stamp = ISO8601DateFormatter.exportStamp.string(from: now)
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("export-\(stamp)", isDirectory: true)
@@ -76,7 +97,10 @@ enum ExportBuilder {
         let document = Document(
             exportedAt: now,
             schemaVersion: ScoringConfiguration.schemaVersion,
-            scans: records
+            scans: records,
+            journalEntries: journalEntries
+                .sorted { $0.dayStart < $1.dayStart }
+                .map(journalRecord(for:))
         )
 
         let encoder = JSONEncoder()
@@ -95,6 +119,7 @@ enum ExportBuilder {
     private static func record(for scan: FaceScan) -> Record {
         Record(
             id: scan.id.uuidString,
+            day: DateFormatter.exportDay.string(from: scan.dayStart),
             capturedAt: scan.capturedAt,
             isDateAdjusted: scan.isDateAdjusted,
             isBackfilled: scan.isBackfilled,
@@ -132,6 +157,35 @@ enum ExportBuilder {
             }
         )
     }
+
+    private static func journalRecord(for entry: JournalEntry) -> JournalRecord {
+        JournalRecord(
+            day: DateFormatter.exportDay.string(from: entry.dayStart),
+            createdAt: entry.createdAt,
+            updatedAt: entry.updatedAt,
+            isBlindToScore: entry.isBlindToScore,
+            perceivedRecovery: entry.perceivedRecovery,
+            sleepQuality: entry.sleepQuality,
+            hoursSlept: entry.hoursSlept,
+            tookMedication: entry.tookMedication,
+            medications: entry.medications,
+            factors: entry.factors,
+            notes: entry.notes
+        )
+    }
+}
+
+private extension DateFormatter {
+    /// In the device's time zone, unlike `ISO8601DateFormatter`, which defaults to UTC and would
+    /// file a local-midnight `dayStart` east of Greenwich under the previous day.
+    static let exportDay: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 }
 
 private extension ISO8601DateFormatter {

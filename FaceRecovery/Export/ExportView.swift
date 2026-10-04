@@ -3,6 +3,7 @@ import SwiftUI
 struct ExportView: View {
     @Environment(\.dismiss) private var dismiss
     let scans: [FaceScan]
+    let journalEntries: [JournalEntry]
 
     @State private var folder: URL?
     @State private var errorMessage: String?
@@ -16,6 +17,7 @@ struct ExportView: View {
                     LabeledContent("Face Scans", value: "\(scans.count)")
                     LabeledContent("Usable", value: "\(scans.filter(\.isUsable).count)")
                     LabeledContent("Research-grade", value: "\(researchGradeCount)")
+                    LabeledContent("Journal entries", value: "\(journalEntries.count)")
                 } footer: {
                     Text("Research-grade means usable and not Date-Adjusted. All scans are exported; the pipeline filters.")
                 }
@@ -36,7 +38,7 @@ struct ExportView: View {
                         Text(errorMessage).font(.caption).foregroundStyle(.red)
                     }
                 } footer: {
-                    Text("Writes scans.json with every Absolute Signal, Capture Quality and Scoring Run, plus the photo files. Recovery Scores and baselines are not exported — the pipeline recomputes them so the app and the analysis can never disagree.")
+                    Text("Writes scans.json with every Absolute Signal, Capture Quality, Scoring Run and Journal Entry, plus the photo files. Recovery Scores and baselines are not exported — the pipeline recomputes them so the app and the analysis can never disagree.")
                 }
 
                 Section {
@@ -56,7 +58,7 @@ struct ExportView: View {
 
     private func build() {
         do {
-            folder = try ExportBuilder.build(scans: scans)
+            folder = try ExportBuilder.build(scans: scans, journalEntries: journalEntries)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription

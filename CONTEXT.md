@@ -93,6 +93,26 @@ A permanent mark on a Face Scan whose date was set by the user rather than read 
 EXIF capture timestamp. Date-Adjusted scans are excluded from research datasets by default.
 _Avoid_: manual date, edited date
 
+### Self-report
+
+**Journal Entry**:
+The user's own account of one day: Perceived Recovery, how they slept, the medicines they took,
+anything else from the day before, and free notes. At most one per day, matched to that day's Face
+Scans by date. It is never sent to the LLM and never changes a Recovery Score.
+_Avoid_: diary, log, check-in, survey, note
+
+**Perceived Recovery**:
+How recovered the user says they feel, on a five-point scale from Exhausted to Great, recorded in a
+Journal Entry. It is kept apart from the Recovery Score (how recovered the face *looks*) and from
+WHOOP Recovery (what the body measures), so that the three can be compared.
+_Avoid_: mood, feeling score, subjective recovery, self-score
+
+**Blind to Score**:
+A Journal Entry answered before any Recovery Score for its day was shown, so the answers cannot have
+been anchored by the number. Only an entry written straight after the shutter is Blind to Score;
+any later edit permanently clears it.
+_Avoid_: unbiased, pre-score
+
 ### Interpretation
 
 **Insight**:

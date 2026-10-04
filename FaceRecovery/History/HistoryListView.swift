@@ -3,10 +3,12 @@ import SwiftData
 
 struct HistoryListView: View {
     @Query(sort: \FaceScan.capturedAt, order: .reverse) private var scans: [FaceScan]
+    @Query(sort: \JournalEntry.dayStart) private var journalEntries: [JournalEntry]
     @State private var isBackfilling = false
     @State private var isExporting = false
 
     private var days: [DayEntry] { DayHistory.build(from: scans) }
+    private var journaledDays: Set<Date> { Set(journalEntries.map(\.dayStart)) }
 
     var body: some View {
         NavigationStack {
@@ -23,7 +25,7 @@ struct HistoryListView: View {
                         // with no observation has no Daily Recovery Score.
                         ForEach(days) { day in
                             NavigationLink(value: day.dayStart) {
-                                DayRow(day: day)
+                                DayRow(day: day, hasJournal: journaledDays.contains(day.dayStart))
                             }
                         }
                     }
@@ -49,13 +51,16 @@ struct HistoryListView: View {
                 }
             }
             .sheet(isPresented: $isBackfilling) { BackfillView() }
-            .sheet(isPresented: $isExporting) { ExportView(scans: scans) }
+            .sheet(isPresented: $isExporting) {
+                ExportView(scans: scans, journalEntries: journalEntries)
+            }
         }
     }
 }
 
 private struct DayRow: View {
     let day: DayEntry
+    let hasJournal: Bool
 
     var body: some View {
         HStack(spacing: 14) {
@@ -90,6 +95,9 @@ private struct DayRow: View {
                     }
                     if day.canonical.isBackfilled {
                         Label("Backfilled", systemImage: "clock.arrow.circlepath")
+                    }
+                    if hasJournal {
+                        Label("Journal", systemImage: "book.closed")
                     }
                 }
                 .font(.caption2)

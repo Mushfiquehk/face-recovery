@@ -51,6 +51,10 @@ struct DayDetailView: View {
                 }
             }
 
+            Section("Journal") {
+                JournalPanel(dayStart: day.dayStart)
+            }
+
             if let signals = canonical.signals {
                 Section("Absolute Signals") {
                     ScanReadingView(signals: signals, score: day.dailyRecoveryScore)

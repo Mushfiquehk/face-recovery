@@ -7,7 +7,8 @@ struct FaceRecoveryApp: App {
     let container: ModelContainer = {
         do {
             return try ModelContainer(
-                for: FaceScan.self, SignalSet.self, CaptureQuality.self, ScoringRun.self
+                for: FaceScan.self, SignalSet.self, CaptureQuality.self, ScoringRun.self,
+                JournalEntry.self
             )
         } catch {
             fatalError("Could not open the scan store: \(error)")

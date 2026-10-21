@@ -14,9 +14,15 @@ struct ScanResultView: View {
                 hero
                     .padding(.top, 8)
 
-                if let score, !score.isBaselineForming, let mover = biggestMover(score) {
+                if let score, !score.isBaselineForming, let mover = score.biggestMover {
                     moverCard(signal: mover, deviation: score[deviation: mover])
                 }
+
+                AudioReportButton(script: DailyReport.script(
+                    dayStart: scan.dayStart,
+                    isScored: scan.isScored,
+                    score: score
+                ))
 
                 card(title: "Journal") {
                     JournalPanel(dayStart: scan.dayStart)
@@ -112,13 +118,6 @@ struct ScanResultView: View {
     }
 
     // MARK: Details
-
-    /// The Signal furthest from baseline, if any moved enough to be worth calling out.
-    private func biggestMover(_ score: RecoveryScore) -> Signal? {
-        Signal.allCases
-            .max { abs(score[deviation: $0]) < abs(score[deviation: $1]) }
-            .flatMap { abs(score[deviation: $0]) >= 5 ? $0 : nil }
-    }
 
     private func moverCard(signal: Signal, deviation: Double) -> some View {
         let worse = deviation > 0

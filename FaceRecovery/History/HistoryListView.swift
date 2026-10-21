@@ -8,6 +8,8 @@ struct HistoryListView: View {
     @State private var isExporting = false
 
     private var days: [DayEntry] { DayHistory.build(from: scans) }
+    private var histogram: ScoreHistogram { ScoreHistogram(days: days) }
+    private var trend: ScoreTrend { ScoreTrend(days: days) }
     private var journaledDays: Set<Date> { Set(journalEntries.map(\.dayStart)) }
 
     var body: some View {
@@ -21,6 +23,10 @@ struct HistoryListView: View {
                     )
                 } else {
                     List {
+                        Section {
+                            HistoryChartsView(histogram: histogram, trend: trend)
+                        }
+
                         // Days with no Face Scan are absent rather than interpolated: a day
                         // with no observation has no Daily Recovery Score.
                         ForEach(days) { day in

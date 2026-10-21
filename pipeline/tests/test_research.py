@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-from PIL import Image
 
 from face_pipeline import research
 
@@ -22,8 +21,9 @@ def test_closed_form_loo_matches_refitting():
 def synthetic(n, signal, seed=1):
     rng = np.random.default_rng(seed)
     m = rng.normal(size=(n, len(research.MEASURES)))
-    y = 65 + signal * 15 * m[:, 1] + rng.normal(scale=15 * (1 - signal) + 1, size=n)
-    return {"measures": m, "embedding": rng.normal(size=(n, 32))}, y
+    planted = research.MEASURES.index("under_eye_shadow")
+    y = 65 + signal * 15 * m[:, planted] + rng.normal(scale=15 * (1 - signal) + 1, size=n)
+    return {"measures": m}, y
 
 
 def test_nested_search_finds_a_planted_signal():
@@ -49,28 +49,6 @@ def test_column_with_no_values_is_harmless():
     y = np.array([1.0, 2.0, 3.0, 4.0])
     assert np.isfinite(research.loo_errors(x, y, 1.0)).all()
     assert np.isfinite(research.ridge_predict(research.ridge_fit(x, y, 1.0), x)).all()
-
-
-def test_measures_from_landmarks(tmp_path):
-    # Flat skin tone with a darker band just under each eye.
-    img = Image.new("RGB", (200, 200), (200, 160, 140))
-    for x0 in (40, 120):
-        img.paste((120, 95, 90), (x0, 84, x0 + 40, 96))
-    path = tmp_path / "face.jpg"
-    img.save(path)
-
-    def eye(x0):
-        return [[(x0 + dx) / 200, (80 + dy) / 200] for dx, dy in ((0, 0), (20, -6), (40, 0), (20, 4))]
-
-    vision = {"landmarks": {
-        "left_eye": eye(40), "right_eye": eye(120),
-        "nose": [[0.5, 0.45], [0.48, 0.65], [0.52, 0.65]],
-        "face_contour": [[0.1, 0.4], [0.5, 0.95], [0.9, 0.4]],
-    }}
-    m = research.measures(path, vision)
-    assert m["under_eye_shadow"] > 10
-    assert m["face_width_ratio"] == pytest.approx(0.8 / 0.4)
-    assert research.measures(path, {"error": "no face found"}) is None
 
 
 def test_run_refuses_tiny_datasets(tmp_path):

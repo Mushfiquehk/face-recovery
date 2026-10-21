@@ -28,6 +28,8 @@ def main(argv: list[str] | None = None) -> None:
     research.add_argument("--permutations", type=int, default=200,
                           help="Label shuffles for the significance test (default 200)")
 
+    sub.add_parser("autoresearch", help="Choose Signals and fit the Sleep Model the app ships")
+
     args = parser.parse_args(argv)
     cfg = config.load()
 
@@ -71,6 +73,15 @@ def main(argv: list[str] | None = None) -> None:
               f"{r['baseline_mae_predict_mean']} (permutation p={r['permutation_p']}).")
         print(r["verdict"])
         print(f"Report: {cfg.research_dir / (args.target + '_report.md')}")
+
+    elif args.command == "autoresearch":
+        from face_pipeline import sleep_model  # needs numpy and Xcode's swiftc
+        _, sleeps = whoop.load_pulled(cfg)
+        r = sleep_model.run(cfg, _discover(cfg), sleeps)
+        kept = ", ".join(s["id"] for s in r["model"]["signals"]) or "none"
+        print(f"Sleep Model {r['model']['version']}: {r['model']['method']}. Signals kept: {kept}.")
+        print(f"Model: {sleep_model.MODEL_PATH}")
+        print(f"Report: {r['report']}")
 
 
 def _discover(cfg: config.Config) -> list[photos.Photo]:

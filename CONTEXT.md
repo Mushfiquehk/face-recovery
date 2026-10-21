@@ -1,63 +1,67 @@
 # Face Recovery
 
-A personal recovery-tracking app: a morning face photo is scored by an image LLM, and the daily
-history of those scores is used to give the user insight into their recovery. A separate research
-strand pairs the same photos with WHOOP data to test whether facial appearance predicts recovery.
+A personal sleep-tracking app: a morning face photo is measured on the device, and those
+measurements predict the user's WHOOP Sleep Performance, with every point of the prediction traced
+back to a visible facial characteristic. A research strand pairs the same photos with WHOOP data to
+fit and test that prediction.
 
 ## Language
 
-### Scoring
+### Prediction
 
 **Face Scan**:
-A single photo of the user's face submitted for scoring, together with the date and time it was
-captured. Scans are never overwritten or deleted.
+A single photo of the user's face, together with the date and time it was captured, measured on
+the device. Scans are never overwritten or deleted.
 _Avoid_: selfie, capture, image, upload
 
 **Signal**:
-One directly observable facial characteristic the LLM rates 0-100 for a Face Scan. There are five:
-under-eye darkness, under-eye puffiness, overall facial puffiness, eye redness, and skin dullness.
-A Signal is an observation, never an inference about cause.
+One directly observable facial characteristic measured on the device from a Face Scan, such as how
+open the eyelids are or how much darker the skin under the eyes is than the cheek. A Signal is an
+observation, never an inference about cause.
 _Avoid_: sub-score, feature, metric, dimension
 
-**Holistic Tiredness**:
-The LLM's overall impression, 0-100, of how tired a face looks. It is rated, baselined and stored
-on every Face Scan but is deliberately excluded from the Recovery Score, so that the decomposed
-Signals and the holistic judgement can be tested against WHOOP Recovery independently.
-_Avoid_: overall score, fatigue score, tiredness signal
+**Sleep Prediction**:
+A 0-100 estimate, from one Face Scan, of the WHOOP Sleep Performance for the night before it. It is
+the Sleep Model's starting value plus one Contribution per Signal, so every point is accounted for.
+_Avoid_: sleep score, recovery score, readiness
 
-**Recovery Score**:
-A 0-100 assessment of how recovered or fatigued a face *looks* in one Face Scan, computed by the
-app from that scan's Signals measured against the user's Personal Baseline. It is a judgement about
-visible appearance only, deliberately independent of any physiological measurement.
-_Avoid_: recovery %, readiness, sleep score
+**Contribution**:
+How many points one Signal moved a Sleep Prediction, given how far that Signal was from the user's
+Personal Baseline. The Contributions of a scan are its explanation.
+_Avoid_: reason, factor, impact, attribution
 
-**Daily Recovery Score**:
-The Recovery Score of a day's Canonical Scan. This is the number shown in the history and used for
-trends. A day with no Face Scan has no Daily Recovery Score.
-_Avoid_: daily score, today's recovery
+**Daily Sleep Prediction**:
+The Sleep Prediction of a day's Canonical Scan. This is the number shown in the history and used for
+trends. A day with no Face Scan has no Daily Sleep Prediction.
+_Avoid_: daily score, today's sleep
 
 **Canonical Scan**:
 The one Face Scan that represents a given day. Defaults to the earliest scan of that day; the user
 may re-designate another, and that re-designation is recorded.
 _Avoid_: primary scan, main photo, selected scan
 
-**WHOOP Recovery**:
-The 0-100 readiness percentage produced by WHOOP from HRV, resting heart rate and sleep. It is
-ground truth for the research strand and is never shown as, or blended into, a Recovery Score.
-_Avoid_: recovery score, recovery percentage
+**Sleep Model**:
+The starting value and per-Signal weights that turn a scan's Signals into a Sleep Prediction. It is
+fitted to the user's own WHOOP Sleep Performance, anchored to published facial cues of sleep loss
+while there are few nights, and every Sleep Prediction records the Sleep Model version behind it.
+_Avoid_: algorithm, AI, weights, classifier
 
 **WHOOP Sleep Performance**:
 WHOOP's 0-100 percentage of the sleep the user needed that they actually got, for the main sleep
-before a Face Scan. A second research ground truth beside WHOOP Recovery, held to the same rule:
-never shown as, or blended into, a Recovery Score.
+before a Face Scan. It is what the Sleep Model is fitted to and what a Sleep Prediction estimates;
+it is never copied into a Sleep Prediction.
 _Avoid_: sleep score, sleep quality
+
+**WHOOP Recovery**:
+The 0-100 readiness percentage produced by WHOOP from HRV, resting heart rate and sleep. A research
+ground truth only: it is never shown as, or blended into, a Sleep Prediction.
+_Avoid_: recovery score, recovery percentage
 
 ### Baselining
 
 **Absolute Signals**:
-The Signal ratings the LLM produces from a Face Scan photo alone, with no reference image and no
-history in the prompt. Every scan has exactly one set, they never change, and they are the only
-data the research strand uses.
+The Signals measured from a Face Scan photo alone, with no reference image and no history. Measuring
+is deterministic, so the same photo and Measurement Version always give the same Absolute Signals.
 _Avoid_: raw scores, unadjusted signals
 
 **Personal Baseline**:
@@ -65,27 +69,35 @@ The trailing 14-day median of each Absolute Signal for this user, representing w
 normally looks like. Recomputable from stored Absolute Signals at any time.
 _Avoid_: normal, reference, average face
 
-**Scoring Run**:
-One invocation of the LLM against one Face Scan, recorded with the provider, model ID, seed, prompt
-version and schema version that produced it. A scan's Absolute Signals are meaningless without the
-Scoring Run that generated them.
-_Avoid_: request, inference, API call
+**Measurement Version**:
+The version of the on-device measurement that produced a scan's Absolute Signals and Capture
+Quality. Photos are kept, so a new Measurement Version re-measures every past Face Scan rather than
+mixing versions.
+_Avoid_: model version, scoring version
 
 **Baseline Forming**:
 The state of a user with fewer than three days of history, where no meaningful Personal Baseline
-exists yet and the app shows Absolute Signals directly.
+exists yet and every Sleep Prediction is marked as provisional.
 _Avoid_: cold start, onboarding period
+
+**LLM Signals**:
+The 0-100 ratings an image LLM gave earlier Face Scans (including its overall Holistic Tiredness),
+each recorded with the Scoring Run that produced it. Kept on those scans and in exports; no new
+scan gets them and they never feed a Sleep Prediction.
+_Avoid_: old signals, legacy scores
 
 ### Capture
 
 **Capture Quality**:
-The LLM's assessment of the photograph itself rather than the face in it: lighting adequacy, whether
-the face is fully visible, and sharpness. Rated on every Face Scan.
+The device's assessment of the photograph rather than the face in it: lighting and its colour,
+sharpness, whether the whole face is visible and facing the camera, and whether glasses are off.
+Scans are always taken without glasses. Measured on every Face Scan.
 _Avoid_: image quality, validity, confidence
 
 **Unusable Scan**:
-A Face Scan whose Capture Quality falls below threshold. It is stored in full but excluded from the
-Personal Baseline and from trends, so that lighting or framing cannot be mistaken for recovery.
+A Face Scan whose Capture Quality falls below threshold. It is stored in full but gets no Sleep
+Prediction and is excluded from the Personal Baseline and from trends, so that lighting or framing
+cannot be mistaken for a bad night.
 _Avoid_: rejected scan, invalid scan, failed scan
 
 ### Provenance
@@ -104,25 +116,25 @@ _Avoid_: manual date, edited date
 **Journal Entry**:
 The user's own account of one day: Perceived Recovery, how they slept, the medicines they took,
 anything else from the day before, and free notes. At most one per day, matched to that day's Face
-Scans by date. It is never sent to the LLM and never changes a Recovery Score.
+Scans by date. It never changes a Sleep Prediction.
 _Avoid_: diary, log, check-in, survey, note
 
 **Perceived Recovery**:
 How recovered the user says they feel, on a five-point scale from Exhausted to Great, recorded in a
-Journal Entry. It is kept apart from the Recovery Score (how recovered the face *looks*) and from
-WHOOP Recovery (what the body measures), so that the three can be compared.
+Journal Entry. It is kept apart from the Sleep Prediction (what the face suggests) and from WHOOP
+(what the body measures), so that the three can be compared.
 _Avoid_: mood, feeling score, subjective recovery, self-score
 
 **Blind to Score**:
-A Journal Entry answered before any Recovery Score for its day was shown, so the answers cannot have
-been anchored by the number. Only an entry written straight after the shutter is Blind to Score;
-any later edit permanently clears it.
+A Journal Entry answered before any Sleep Prediction for its day was shown, so the answers cannot
+have been anchored by the number. Only an entry written straight after the shutter is Blind to
+Score; any later edit permanently clears it.
 _Avoid_: unbiased, pre-score
 
 ### Interpretation
 
 **Insight**:
-A statement the app derives arithmetically from stored Signals and Recovery Scores, such as a
-deviation from Personal Baseline or a trend over a window. Insights describe what was observed and
-never assert a physiological cause or give health advice.
+A statement the app derives arithmetically from stored Signals, Contributions and Sleep Predictions,
+such as a deviation from Personal Baseline or a trend over a window. Insights describe what was
+observed and never assert a physiological cause or give health advice.
 _Avoid_: recommendation, advice, analysis, coaching

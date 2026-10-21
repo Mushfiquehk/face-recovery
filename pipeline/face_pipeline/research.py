@@ -1,13 +1,10 @@
-"""Searches for a face-photo model of a WHOOP target, and measures honestly whether it beats guessing.
+"""Searches for any combination of Signals that predicts a WHOOP target, and measures honestly
+whether it beats guessing. A check on the Sleep Model, not the model itself (see sleep_model.py).
 
-Research strand only (CONTEXT.md): nothing here feeds a Recovery Score.
-
-Features come from three families, all optional:
-  measures  - interpretable numbers from Apple Vision landmarks and pixels (vision_features.swift):
-              eye openness, under-eye darkness and colour against the cheek, eye redness, skin
-              brightness and chroma, face width. Computed on this Mac; no photo leaves it.
-  embedding - Vision feature print of the face crop, reduced by PCA inside each training fold.
-  signals   - the LLM Absolute Signals already in dataset.csv, when photos were scored.
+Features come from two families:
+  measures - the app's own on-device Signals (FaceMeasurement.swift via measure.py), on photos its
+             Capture Quality accepts. Computed on this Mac; no photo leaves it.
+  signals  - LLM Signals already in dataset.csv, when photos were scored, from one Scoring Run setup.
 
 The search tries every candidate (family x feature subset x ridge strength) and keeps the one with
 the lowest leave-one-out error. Because picking the best of many candidates on few photos flatters
@@ -21,151 +18,36 @@ from __future__ import annotations
 
 import csv
 import json
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageOps
 
-from face_pipeline import scoring
-
-SWIFT_SCRIPT = Path(__file__).with_name("vision_features.swift")
+from face_pipeline import measure, scoring, sleep_model
 
 TARGETS = {
     "sleep": "whoop_sleep_performance_percentage",
     "recovery": "whoop_recovery",
 }
 SIGNAL_COLUMNS = [key for key, _ in scoring.SIGNALS] + ["holistic_tiredness"]
-MEASURES = [
-    "eye_openness",
-    "under_eye_shadow",  # cheek L* minus under-eye L*: higher is darker under the eyes
-    "under_eye_blue",  # cheek b* minus under-eye b*: bluish/purple shadow
-    "sclera_redness",  # a* of the brightest (sclera) pixels inside the eyes
-    "skin_brightness",  # cheek L*: mostly lighting, kept so models can adjust for it
-    "skin_chroma",  # cheek colourfulness: low reads as dull
-    "face_width_ratio",  # jaw width / distance between eyes: rises with facial puffiness
-]
+MEASURES = [c.signal for cue in sleep_model.CUES for c in cue.candidates]
 RIDGE_ALPHAS = [0.3, 3.0, 30.0, 300.0]
-EMBEDDING_COMPONENTS = [2, 4, 8]
 MIN_ROWS = 8  # below this, leave-one-out has nothing to learn from
 MIN_ROWS_FOR_CLAIMS = 30  # below this, say so loudly whatever the numbers look like
-
-
-# ---------------------------------------------------------------- feature extraction
-
-def extract_vision(image_paths: list[Path], cache: Path) -> dict[str, dict]:
-    """Runs the Swift helper on photos not yet in the JSON Lines cache; returns {filename: record}."""
-    done: dict[str, dict] = {}
-    if cache.exists():
-        for line in cache.read_text().splitlines():
-            record = json.loads(line)
-            done[Path(record["path"]).name] = record
-    todo = [p for p in image_paths if p.name not in done]
-    if todo:
-        result = subprocess.run(["swift", str(SWIFT_SCRIPT), *map(str, todo)],
-                                capture_output=True, text=True, check=True)
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        with cache.open("a") as f:
-            for line in result.stdout.splitlines():
-                record = json.loads(line)
-                done[Path(record["path"]).name] = record
-                f.write(line + "\n")
-    return done
-
-
-def measures(image_path: Path, vision: dict) -> dict[str, float] | None:
-    """Interpretable face measures from landmarks and pixels, or None when no face was found."""
-    if vision.get("error"):
-        return None
-    marks = {k: np.array(v, dtype=float) for k, v in vision["landmarks"].items()}
-    if any(len(marks.get(k, [])) < 3 for k in ("left_eye", "right_eye", "face_contour", "nose")):
-        return None
-
-    with Image.open(image_path) as img:
-        img = ImageOps.exif_transpose(img).convert("RGB")
-    size = np.array(img.size, dtype=float)
-    lab = _srgb_to_lab(np.asarray(img, dtype=float) / 255.0)
-
-    def px(points: np.ndarray) -> np.ndarray:
-        return points * size
-
-    eyes = [px(marks["left_eye"]), px(marks["right_eye"])]
-    eye_widths = [np.ptp(e[:, 0]) for e in eyes]
-    eye_centres = [e.mean(axis=0) for e in eyes]
-    interocular = float(np.linalg.norm(eye_centres[0] - eye_centres[1]))
-    if interocular <= 0 or min(eye_widths) <= 0:
-        return None
-
-    nose_bottom = px(marks["nose"])[:, 1].max()
-    under, cheek, sclera_a = [], [], []
-    for eye, width, centre in zip(eyes, eye_widths, eye_centres):
-        bottom = eye[:, 1].max()
-        half = width / 2
-        # Under-eye band: just below the lower lid, as wide as the eye.
-        under.append(_box(lab, centre[0] - half, bottom + 0.1 * width, centre[0] + half, bottom + 0.5 * width))
-        # Cheek: below the band, above the bottom of the nose, same column.
-        top = bottom + 0.7 * width
-        cheek.append(_box(lab, centre[0] - half, top, centre[0] + half, max(top + 0.3 * width, nose_bottom)))
-        inside = _polygon(lab, eye)
-        if len(inside) >= 4:
-            bright = inside[inside[:, 0] >= np.percentile(inside[:, 0], 70)]
-            sclera_a.append(bright[:, 1].mean())
-
-    under_px, cheek_px = np.concatenate(under), np.concatenate(cheek)
-    if len(under_px) == 0 or len(cheek_px) == 0:
-        return None
-    contour = px(marks["face_contour"])
-    openness = np.mean([np.ptp(e[:, 1]) / w for e, w in zip(eyes, eye_widths)])
-
-    return {
-        "eye_openness": float(openness),
-        "under_eye_shadow": float(np.median(cheek_px[:, 0]) - np.median(under_px[:, 0])),
-        "under_eye_blue": float(np.median(cheek_px[:, 2]) - np.median(under_px[:, 2])),
-        "sclera_redness": float(np.mean(sclera_a)) if sclera_a else float("nan"),
-        "skin_brightness": float(np.median(cheek_px[:, 0])),
-        "skin_chroma": float(np.median(np.hypot(cheek_px[:, 1], cheek_px[:, 2]))),
-        "face_width_ratio": float(np.ptp(contour[:, 0]) / interocular),
-    }
-
-
-def _box(lab: np.ndarray, x0: float, y0: float, x1: float, y1: float) -> np.ndarray:
-    h, w = lab.shape[:2]
-    x0, x1 = (int(np.clip(v, 0, w)) for v in (x0, x1))
-    y0, y1 = (int(np.clip(v, 0, h)) for v in (y0, y1))
-    return lab[y0:y1, x0:x1].reshape(-1, 3)
-
-
-def _polygon(lab: np.ndarray, points: np.ndarray) -> np.ndarray:
-    mask = Image.new("L", (lab.shape[1], lab.shape[0]), 0)
-    ImageDraw.Draw(mask).polygon([tuple(p) for p in points], fill=1)
-    return lab[np.asarray(mask, dtype=bool)]
-
-
-def _srgb_to_lab(rgb: np.ndarray) -> np.ndarray:
-    linear = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
-    xyz = linear @ np.array([[0.4124, 0.3576, 0.1805],
-                             [0.2126, 0.7152, 0.0722],
-                             [0.0193, 0.1192, 0.9505]]).T
-    xyz /= np.array([0.95047, 1.0, 1.08883])
-    f = np.where(xyz > 0.008856, np.cbrt(xyz), 7.787 * xyz + 16 / 116)
-    return np.stack([116 * f[..., 1] - 16, 500 * (f[..., 0] - f[..., 1]), 200 * (f[..., 1] - f[..., 2])], axis=-1)
 
 
 # ---------------------------------------------------------------- model search
 
 @dataclass(frozen=True)
 class Candidate:
-    family: str  # "measures", "embedding", "signals", or "measures+signals"
-    columns: tuple[str, ...]  # feature names; for embedding, ("embedding",)
+    family: str  # "measures", "signals", or "measures+signals"
+    columns: tuple[str, ...]
     alpha: float
-    components: int = 0  # PCA components, embedding only
 
     @property
     def name(self) -> str:
         cols = "all" if len(self.columns) > 1 else self.columns[0]
-        pca = f", pca={self.components}" if self.components else ""
-        return f"{self.family}[{cols}]{pca}, alpha={self.alpha:g}"
+        return f"{self.family}[{cols}], alpha={self.alpha:g}"
 
 
 def candidates(available: dict[str, np.ndarray]) -> list[Candidate]:
@@ -180,8 +62,6 @@ def candidates(available: dict[str, np.ndarray]) -> list[Candidate]:
                 out.extend(Candidate(family, (c,), alpha) for c in cols)
         if "measures" in available and "signals" in available:
             out.append(Candidate("measures+signals", tuple(MEASURES + SIGNAL_COLUMNS), alpha))
-        if "embedding" in available:
-            out.extend(Candidate("embedding", ("embedding",), alpha, k) for k in EMBEDDING_COMPONENTS)
     return out
 
 
@@ -189,21 +69,8 @@ def _columns(family: str) -> list[str]:
     return MEASURES if family == "measures" else SIGNAL_COLUMNS
 
 
-def design(candidate: Candidate, data: dict[str, np.ndarray], train: np.ndarray, rows: np.ndarray,
-           pca_cache: dict | None = None) -> np.ndarray:
-    """Feature matrix for `rows`, with every fitted transform (PCA) learned on `train` only.
-    `pca_cache` reuses a PCA across candidates and permutations that share a training set."""
-    if candidate.family == "embedding":
-        emb = data["embedding"]
-        key = train.tobytes()
-        if pca_cache is None or key not in pca_cache:
-            mean = emb[train].mean(axis=0)
-            _, _, vt = np.linalg.svd(emb[train] - mean, full_matrices=False)
-            basis = (mean, vt[:max(EMBEDDING_COMPONENTS)])
-            if pca_cache is not None:
-                pca_cache[key] = basis
-        mean, vt = pca_cache[key] if pca_cache is not None else basis
-        return (emb[rows] - mean) @ vt[:candidate.components].T
+def design(candidate: Candidate, data: dict[str, np.ndarray], rows: np.ndarray) -> np.ndarray:
+    """Feature matrix of `candidate`'s columns for `rows`."""
     parts = []
     for family in candidate.family.split("+"):
         cols = _columns(family)
@@ -252,30 +119,29 @@ def loo_errors(x: np.ndarray, y: np.ndarray, alpha: float) -> np.ndarray:
     return np.abs(residual / np.clip(1 - np.diag(hat), 1e-9, None))
 
 
-def select(data: dict[str, np.ndarray], y: np.ndarray, rows: np.ndarray, pool: list[Candidate],
-           pca_cache: dict | None = None) -> tuple[Candidate, float]:
+def select(data: dict[str, np.ndarray], y: np.ndarray, rows: np.ndarray, pool: list[Candidate]
+           ) -> tuple[Candidate, float]:
     """Best candidate by leave-one-out MAE over `rows`."""
     best, best_mae = pool[0], float("inf")
     for c in pool:
-        mae = float(loo_errors(design(c, data, rows, rows, pca_cache), y[rows], c.alpha).mean())
+        mae = float(loo_errors(design(c, data, rows), y[rows], c.alpha).mean())
         if mae < best_mae:
             best, best_mae = c, mae
     return best, best_mae
 
 
-def nested_loo(data: dict[str, np.ndarray], y: np.ndarray, pool: list[Candidate],
-               pca_cache: dict | None = None) -> tuple[np.ndarray, np.ndarray, list[Candidate]]:
+def nested_loo(data: dict[str, np.ndarray], y: np.ndarray, pool: list[Candidate]
+               ) -> tuple[np.ndarray, np.ndarray, list[Candidate]]:
     """Outer leave-one-out around the whole search. Returns (predictions, mean-baseline predictions,
     the candidate chosen for each held-out row)."""
     n = len(y)
-    pca_cache = {} if pca_cache is None else pca_cache
     pred, base, chosen = np.empty(n), np.empty(n), []
     for i in range(n):
         train = np.delete(np.arange(n), i)
-        c, _ = select(data, y, train, pool, pca_cache)
-        model = ridge_fit(design(c, data, train, train, pca_cache), y[train], c.alpha)
+        c, _ = select(data, y, train, pool)
+        model = ridge_fit(design(c, data, train), y[train], c.alpha)
         # Both targets are percentages; on few nights an extrapolated line can leave that range.
-        pred[i] = np.clip(ridge_predict(model, design(c, data, train, np.array([i]), pca_cache))[0], 0, 100)
+        pred[i] = np.clip(ridge_predict(model, design(c, data, np.array([i])))[0], 0, 100)
         base[i] = y[train].mean()
         chosen.append(c)
     return pred, base, chosen
@@ -285,11 +151,10 @@ def permutation_p(data: dict[str, np.ndarray], y: np.ndarray, pool: list[Candida
                   permutations: int, seed: int) -> float:
     """Share of label shuffles whose whole nested search does at least as well as the real one."""
     rng = np.random.default_rng(seed)
-    pca_cache: dict = {}  # features never change between shuffles, so neither do the PCAs
     hits = 0
     for _ in range(permutations):
         shuffled = rng.permutation(y)
-        pred, _, _ = nested_loo(data, shuffled, pool, pca_cache)
+        pred, _, _ = nested_loo(data, shuffled, pool)
         hits += np.abs(pred - shuffled).mean() <= observed_mae
     return (hits + 1) / (permutations + 1)
 
@@ -313,24 +178,23 @@ def run(dataset_dir: Path, out_dir: Path, target: str, permutations: int = 200, 
             f"the search needs at least {MIN_ROWS} and a claim needs about {MIN_ROWS_FOR_CLAIMS}+. "
             "Add dated photos (see pipeline/README.md) and re-run build-dataset.")
 
-    vision = extract_vision([dataset_dir / r["image"] for r in rows], out_dir / "vision.jsonl")
+    measured = measure.measure([dataset_dir / r["image"] for r in rows], out_dir)
     kept, feats = [], []
     for r in rows:
-        m = measures(dataset_dir / r["image"], vision[Path(r["image"]).name])
-        if m is not None:
+        m = measured[dataset_dir / r["image"]].get("measurement")
+        if m and m["quality"]["usable"]:
             kept.append(r)
-            feats.append((m, vision[Path(r["image"]).name]["embedding"]))
-    dropped_no_face = len(rows) - len(kept)
+            feats.append(m["signals"])
+    dropped_unusable = len(rows) - len(kept)
     rows = kept
     if len(rows) < MIN_ROWS:
-        raise SystemExit(f"Only {len(rows)} photos had a detectable face; need at least {MIN_ROWS}.")
+        raise SystemExit(f"Only {len(rows)} photos passed on-device Capture Quality (no face, glasses, "
+                         f"light or blur rejected the rest); need at least {MIN_ROWS}.")
 
     y = np.array([float(r[column]) for r in rows])
     data: dict[str, np.ndarray] = {
-        "measures": np.array([[m[k] for k in MEASURES] for m, _ in feats]),
+        "measures": np.array([[f.get(k, np.nan) for k in MEASURES] for f in feats]),
     }
-    if all(len(e) for _, e in feats):
-        data["embedding"] = np.array([e for _, e in feats], dtype=float)
     signals, signal_run = _comparable_signals(rows)
     if signal_run:
         data["signals"] = signals
@@ -342,7 +206,7 @@ def run(dataset_dir: Path, out_dir: Path, target: str, permutations: int = 200, 
 
     final, final_inner_mae = select(data, y, np.arange(len(y)), pool)
     all_rows = np.arange(len(y))
-    final_model = ridge_fit(design(final, data, all_rows, all_rows), y, final.alpha)
+    final_model = ridge_fit(design(final, data, all_rows), y, final.alpha)
 
     correlations = {name: spearman(data[fam][:, i], y)
                     for fam in ("measures", "signals") if fam in data
@@ -355,7 +219,7 @@ def run(dataset_dir: Path, out_dir: Path, target: str, permutations: int = 200, 
     result = {
         "target": column,
         "photos": len(y),
-        "dropped_no_face": dropped_no_face,
+        "dropped_unusable": dropped_unusable,
         "families": sorted(data),
         "signals_scoring_run": signal_run,
         "candidates_searched": len(pool),
@@ -370,7 +234,6 @@ def run(dataset_dir: Path, out_dir: Path, target: str, permutations: int = 200, 
             "candidate": final.name,
             "inner_loo_mae_optimistic": round(final_inner_mae, 2),
             "features": list(final.columns),
-            "pca_components": final.components,
             "alpha": final.alpha,
             "feature_mean": final_model[0].tolist(),
             "feature_scale": final_model[1].tolist(),
@@ -444,7 +307,7 @@ def _report(r: dict) -> str:
         "",
         "| | |",
         "|---|---|",
-        f"| Nights (canonical, usable, face found) | {r['photos']} ({r['dropped_no_face']} dropped: no face) |",
+        f"| Nights (canonical, passed Capture Quality) | {r['photos']} ({r['dropped_unusable']} dropped) |",
         f"| Feature families | {', '.join(r['families'])} |",
         f"| LLM signals from | {r['signals_scoring_run'] or 'not used (no single Scoring Run covers 80% of nights)'} |",
         f"| Candidates searched | {r['candidates_searched']} |",

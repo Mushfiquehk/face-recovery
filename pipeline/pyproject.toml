@@ -25,4 +25,4 @@ face-pipeline = "face_pipeline.cli:main"
 packages = ["face_pipeline"]
 
 [tool.setuptools.package-data]
-face_pipeline = ["*.swift"]
+face_pipeline = ["measure/*.swift"]

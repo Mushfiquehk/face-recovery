@@ -32,7 +32,7 @@ def test_nested_search_finds_a_planted_signal():
     pred, base, chosen = research.nested_loo(data, y, pool)
     mae = np.abs(pred - y).mean()
     assert mae < 0.6 * np.abs(base - y).mean()
-    assert sum("under_eye_darkness" in c.columns for c in chosen) > 30
+    assert sum("under_eye_shadow" in c.columns for c in chosen) > 30
     assert research.permutation_p(data, y, pool, mae, permutations=20, seed=0) < 0.1
 
 
@@ -68,7 +68,7 @@ def test_measures_from_landmarks(tmp_path):
         "face_contour": [[0.1, 0.4], [0.5, 0.95], [0.9, 0.4]],
     }}
     m = research.measures(path, vision)
-    assert m["under_eye_darkness"] > 10
+    assert m["under_eye_shadow"] > 10
     assert m["face_width_ratio"] == pytest.approx(0.8 / 0.4)
     assert research.measures(path, {"error": "no face found"}) is None
 

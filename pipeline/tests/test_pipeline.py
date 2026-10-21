@@ -140,6 +140,23 @@ def test_build_end_to_end(cfg):
     assert reasons == {"evening.jpg": "taken more than 4h after waking", "undated.jpg": "no EXIF capture time"}
 
 
+def test_build_reuses_app_scoring_run(cfg):
+    export = cfg.photo_input_dir / "export-2026-09-01"
+    export.mkdir(parents=True)
+    write_photo(export / "scan.jpg", None)
+    (export / "scans.json").write_text(json.dumps({"scans": [{
+        "photo": "scan.jpg", "captured_at": "2026-09-01T06:45:00Z", "is_date_adjusted": False,
+        "signals": {k: 20 for k, _ in scoring.SIGNALS} | {"holistic_tiredness": 55},
+        "capture_quality": {"lighting": 60, "sharpness": 70, "face_fully_visible": True, "usable": True},
+        "scoring_run": {"provider": "CoreWeave", "model_id": "z-ai/glm", "prompt_version": "v1", "schema_version": "v1"},
+    }]}))
+    manifest = dataset.build(cfg, photos.discover(cfg.photo_input_dir, "UTC"), list(BY_SLEEP.values()), SLEEPS)
+    assert (manifest["paired"], manifest["scored"]) == (1, 1)
+    row = next(csv.DictReader((cfg.dataset_output_dir / "dataset.csv").open()))
+    assert row["time_source"] == "app-export" and row["holistic_tiredness"] == "55"
+    assert row["scoring_model"] == "z-ai/glm" and row["usable"] == "True"
+
+
 class FakeResponse:
     def __init__(self, body, status=200):
         self.body, self.status_code, self.headers = body, status, {}

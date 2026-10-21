@@ -39,9 +39,9 @@ TARGETS = {
 SIGNAL_COLUMNS = [key for key, _ in scoring.SIGNALS] + ["holistic_tiredness"]
 MEASURES = [
     "eye_openness",
-    "under_eye_darkness",  # cheek L* minus under-eye L*: higher is darker under the eyes
+    "under_eye_shadow",  # cheek L* minus under-eye L*: higher is darker under the eyes
     "under_eye_blue",  # cheek b* minus under-eye b*: bluish/purple shadow
-    "eye_redness",  # a* of the brightest (sclera) pixels inside the eyes
+    "sclera_redness",  # a* of the brightest (sclera) pixels inside the eyes
     "skin_brightness",  # cheek L*: mostly lighting, kept so models can adjust for it
     "skin_chroma",  # cheek colourfulness: low reads as dull
     "face_width_ratio",  # jaw width / distance between eyes: rises with facial puffiness
@@ -120,9 +120,9 @@ def measures(image_path: Path, vision: dict) -> dict[str, float] | None:
 
     return {
         "eye_openness": float(openness),
-        "under_eye_darkness": float(np.median(cheek_px[:, 0]) - np.median(under_px[:, 0])),
+        "under_eye_shadow": float(np.median(cheek_px[:, 0]) - np.median(under_px[:, 0])),
         "under_eye_blue": float(np.median(cheek_px[:, 2]) - np.median(under_px[:, 2])),
-        "eye_redness": float(np.mean(sclera_a)) if sclera_a else float("nan"),
+        "sclera_redness": float(np.mean(sclera_a)) if sclera_a else float("nan"),
         "skin_brightness": float(np.median(cheek_px[:, 0])),
         "skin_chroma": float(np.median(np.hypot(cheek_px[:, 1], cheek_px[:, 2]))),
         "face_width_ratio": float(np.ptp(contour[:, 0]) / interocular),
@@ -274,7 +274,8 @@ def nested_loo(data: dict[str, np.ndarray], y: np.ndarray, pool: list[Candidate]
         train = np.delete(np.arange(n), i)
         c, _ = select(data, y, train, pool, pca_cache)
         model = ridge_fit(design(c, data, train, train, pca_cache), y[train], c.alpha)
-        pred[i] = ridge_predict(model, design(c, data, train, np.array([i]), pca_cache))[0]
+        # Both targets are percentages; on few nights an extrapolated line can leave that range.
+        pred[i] = np.clip(ridge_predict(model, design(c, data, train, np.array([i]), pca_cache))[0], 0, 100)
         base[i] = y[train].mean()
         chosen.append(c)
     return pred, base, chosen
@@ -330,8 +331,8 @@ def run(dataset_dir: Path, out_dir: Path, target: str, permutations: int = 200, 
     }
     if all(len(e) for _, e in feats):
         data["embedding"] = np.array([e for _, e in feats], dtype=float)
-    signals = np.array([[_float(r.get(c)) for c in SIGNAL_COLUMNS] for r in rows])
-    if not np.isnan(signals).all(axis=1).any():
+    signals, signal_run = _comparable_signals(rows)
+    if signal_run:
         data["signals"] = signals
 
     pool = candidates(data)
@@ -356,6 +357,7 @@ def run(dataset_dir: Path, out_dir: Path, target: str, permutations: int = 200, 
         "photos": len(y),
         "dropped_no_face": dropped_no_face,
         "families": sorted(data),
+        "signals_scoring_run": signal_run,
         "candidates_searched": len(pool),
         "nested_loo_mae": round(mae, 2),
         "baseline_mae_predict_mean": round(base_mae, 2),
@@ -400,6 +402,23 @@ def _load_rows(dataset_dir: Path, column: str) -> list[dict]:
             if r.get("is_canonical") == "True" and r.get("usable") != "False" and r.get(column) not in ("", None)]
 
 
+def _comparable_signals(rows: list[dict]) -> tuple[np.ndarray, str | None]:
+    """Absolute Signals only mean something within one Scoring Run setup (CONTEXT.md), so keep the
+    most common provider/model/prompt and blank the rest; blanks are then imputed like any gap.
+    Returns (signals, that run), with run None when under 80% of rows share it."""
+    runs = [(r.get("scoring_provider"), r.get("scoring_model"), r.get("prompt_version"))
+            if r.get("prompt_version") else None for r in rows]
+    counted = [run for run in runs if run]
+    if not counted:
+        return np.empty((len(rows), 0)), None
+    dominant = max(set(counted), key=counted.count)
+    signals = np.array([[_float(r.get(c)) if run == dominant else float("nan") for c in SIGNAL_COLUMNS]
+                        for r, run in zip(rows, runs)])
+    if counted.count(dominant) < 0.8 * len(rows):
+        return signals, None
+    return signals, " / ".join(dominant)
+
+
 def _float(value) -> float:
     try:
         return float(value)
@@ -427,6 +446,7 @@ def _report(r: dict) -> str:
         "|---|---|",
         f"| Nights (canonical, usable, face found) | {r['photos']} ({r['dropped_no_face']} dropped: no face) |",
         f"| Feature families | {', '.join(r['families'])} |",
+        f"| LLM signals from | {r['signals_scoring_run'] or 'not used (no single Scoring Run covers 80% of nights)'} |",
         f"| Candidates searched | {r['candidates_searched']} |",
         f"| **Nested leave-one-out MAE** | **{r['nested_loo_mae']}** points |",
         f"| Guess-the-mean MAE | {r['baseline_mae_predict_mean']} points |",

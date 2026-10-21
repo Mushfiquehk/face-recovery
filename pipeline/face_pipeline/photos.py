@@ -43,32 +43,32 @@ def discover(folder: Path, assumed_zone: str | None = None) -> list[Photo]:
     zone: tzinfo = ZoneInfo(assumed_zone) if assumed_zone else _local_zone()
     paths = sorted(p for p in folder.rglob("*")
                    if p.is_file() and p.suffix.lower() in EXTENSIONS and not p.name.startswith("."))
-    exported = _app_export_times(folder)
+    exported = app_export_scans(folder)
     out = []
     for p in paths:
         photo = _read(p, zone)
-        if photo.captured_at is None and p in exported:
-            captured_at = exported[p]
+        scan = exported.get(p)
+        if photo.captured_at is None and scan and scan.get("captured_at"):
+            adjusted = bool(scan.get("is_date_adjusted"))
+            captured_at = None if adjusted else datetime.fromisoformat(scan["captured_at"].replace("Z", "+00:00"))
             photo = Photo(path=p, sha256=photo.sha256, captured_at=captured_at,
-                          time_source="app-export" if captured_at else "date-adjusted")
+                          time_source="date-adjusted" if adjusted else "app-export")
         out.append(photo)
     return out
 
 
-def _app_export_times(folder: Path) -> dict[Path, datetime | None]:
-    """{photo path: captured_at} from every app `scans.json` under `folder`; None when Date-Adjusted."""
-    times: dict[Path, datetime | None] = {}
+def app_export_scans(folder: Path) -> dict[Path, dict]:
+    """{photo path: scan record} from every app `scans.json` under `folder`."""
+    records: dict[Path, dict] = {}
     for manifest in folder.rglob("scans.json"):
         try:
             scans = json.loads(manifest.read_text()).get("scans", [])
         except (OSError, ValueError):
             continue
         for scan in scans:
-            if not scan.get("photo") or not scan.get("captured_at"):
-                continue
-            captured_at = datetime.fromisoformat(scan["captured_at"].replace("Z", "+00:00"))
-            times[manifest.parent / scan["photo"]] = None if scan.get("is_date_adjusted") else captured_at
-    return times
+            if scan.get("photo"):
+                records[manifest.parent / scan["photo"]] = scan
+    return records
 
 
 def _read(path: Path, zone: tzinfo) -> Photo:

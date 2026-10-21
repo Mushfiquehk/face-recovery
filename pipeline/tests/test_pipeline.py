@@ -80,12 +80,31 @@ def test_exif_dating(tmp_path):
     assert c.captured_at is None and c.time_source == "missing"
 
 
+def test_app_export_dated_from_scans_json(tmp_path):
+    export = tmp_path / "export-2026-10-04"
+    export.mkdir()
+    for name in ("live.jpg", "adjusted.jpg", "exif.jpg"):
+        write_photo(export / name, datetime(2026, 9, 1, 7, 0) if name == "exif.jpg" else None, "+00:00")
+    (export / "scans.json").write_text(json.dumps({"scans": [
+        {"photo": "live.jpg", "captured_at": "2026-09-02T11:15:00Z", "is_date_adjusted": False},
+        {"photo": "adjusted.jpg", "captured_at": "2026-09-03T11:15:00Z", "is_date_adjusted": True},
+        {"photo": "exif.jpg", "captured_at": "2026-09-09T11:15:00Z", "is_date_adjusted": False},
+    ]}))
+    found = {p.path.name: p for p in photos.discover(tmp_path, "UTC")}
+    assert found["live.jpg"].captured_at == datetime(2026, 9, 2, 11, 15, tzinfo=UTC)
+    assert found["live.jpg"].time_source == "app-export"
+    assert found["adjusted.jpg"].captured_at is None and found["adjusted.jpg"].time_source == "date-adjusted"
+    # EXIF, when present, still wins.
+    assert found["exif.jpg"].time_source == "exif+offset"
+
+
 @pytest.fixture
 def cfg(tmp_path):
     base = config.load()
     return replace(base, root=tmp_path, photo_input_dir=tmp_path / "photos",
                    dataset_output_dir=tmp_path / "dataset", whoop_data_dir=tmp_path / "whoop",
-                   scores_dir=tmp_path / "scores", photo_timezone="UTC", max_hours_after_wake=4)
+                   scores_dir=tmp_path / "scores", research_dir=tmp_path / "research",
+                   photo_timezone="UTC", max_hours_after_wake=4)
 
 
 def test_build_end_to_end(cfg):

@@ -49,12 +49,38 @@ Recovery WHOOP already had that morning — nothing from later leaks in. The ear
 night is marked `is_canonical`, mirroring the app's Canonical Scan default.
 
 Photos with no EXIF capture time are excluded rather than dated from file timestamps, the
-equivalent of the app's Date-Adjusted exclusion. Screenshots, messaging-app saves and some edited
+equivalent of the app's Date-Adjusted exclusion. The app saves its photos without EXIF, so copy
+an app export folder (`export-<date>/`, photos plus `scans.json`) into `data/photos/` whole: its
+photos are dated from `scans.json`, and Date-Adjusted scans stay excluded. Screenshots, messaging-app saves and some edited
 exports lose EXIF; export originals from Photos ("Export Unmodified Original") to keep it.
 
 EXIF times without an offset are read in `PHOTO_TIMEZONE` (default: this Mac's zone). Photos
 taken while travelling in another zone are only correct if the camera wrote an offset, which
 iPhones do.
+
+## Research: does the face predict WHOOP?
+
+```sh
+.venv/bin/pip install -e ".[research]"     # numpy; Apple Vision runs through Xcode's swift
+.venv/bin/face-pipeline research                     # target: WHOOP Sleep Performance
+.venv/bin/face-pipeline research --target recovery   # target: WHOOP Recovery
+```
+
+Uses one photo per night (the canonical one, never an Unusable Scan). Three feature families:
+interpretable **measures** from Apple Vision landmarks and pixels (eye openness, under-eye darkness
+and blueness against the cheek, eye redness, skin brightness and chroma, face width), the Vision
+**embedding** of the face crop, and the LLM **signals** when photos were scored. Vision runs on
+this Mac, so the measures and embedding never send a photo anywhere.
+
+It searches every family, feature subset and ridge strength, then reports the honest number: a
+**nested** leave-one-out error (each night predicted by a search that never saw it) against
+guessing your mean, plus a permutation p-value from re-running the whole search on shuffled
+targets. Output in `data/research/`: `<target>_report.md`, `_results.json` (including the fitted
+model's coefficients) and `_predictions.csv`.
+
+Fewer than 8 nights refuses to run; fewer than 30 runs but is labelled as noise. Keep capture
+conditions steady (same spot, same light, glasses off): lighting moves the pixel measures far
+more than a bad night does.
 
 ## Tests
 

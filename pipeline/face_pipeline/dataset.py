@@ -65,7 +65,9 @@ def build(cfg: Config, photos: list[Photo], recoveries: list[dict], sleeps: list
     for photo in sorted(photos, key=lambda p: p.captured_at or datetime.max.replace(tzinfo=timezone.utc)):
         source = str(photo.path.relative_to(cfg.photo_input_dir))
         if photo.captured_at is None:
-            unmatched.append({"source_file": source, "captured_at": "", "reason": "no EXIF capture time"})
+            reason = ("Date-Adjusted in the app" if photo.time_source == "date-adjusted"
+                      else "no EXIF capture time")
+            unmatched.append({"source_file": source, "captured_at": "", "reason": reason})
             continue
         result = pair(photo.captured_at, sleeps, by_sleep, cfg.max_hours_after_wake)
         if result.reason:

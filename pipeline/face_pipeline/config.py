@@ -29,6 +29,7 @@ class Config:
     dataset_output_dir: Path
     whoop_data_dir: Path
     scores_dir: Path
+    research_dir: Path
 
     # Photo EXIF times are local wall-clock with no zone unless the camera wrote an offset.
     # Empty means "this Mac's local zone".
@@ -70,6 +71,7 @@ def load() -> Config:
         dataset_output_dir=path("DATASET_OUTPUT_DIR", "./data/dataset"),
         whoop_data_dir=path("WHOOP_DATA_DIR", "./data/whoop"),
         scores_dir=path("SCORES_DIR", "./data/scores"),
+        research_dir=path("RESEARCH_DIR", "./data/research"),
         photo_timezone=os.getenv("PHOTO_TIMEZONE") or None,
         max_hours_after_wake=float(os.getenv("MAX_HOURS_AFTER_WAKE", "4")),
     )

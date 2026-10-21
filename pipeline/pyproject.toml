@@ -15,10 +15,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "numpy>=1.26"]
+research = ["numpy>=1.26"]  # face-pipeline research; also needs Xcode's swift for Apple Vision
 
 [project.scripts]
 face-pipeline = "face_pipeline.cli:main"
 
 [tool.setuptools]
 packages = ["face_pipeline"]
+
+[tool.setuptools.package-data]
+face_pipeline = ["*.swift"]

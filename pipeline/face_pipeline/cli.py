@@ -1,4 +1,4 @@
-"""face-pipeline whoop-auth | whoop-pull | score | build-dataset"""
+"""face-pipeline whoop-auth | whoop-pull | score | build-dataset | research"""
 
 from __future__ import annotations
 
@@ -21,6 +21,12 @@ def main(argv: list[str] | None = None) -> None:
     score.add_argument("--limit", type=int, help="Score at most N new photos (try 1 first)")
 
     sub.add_parser("build-dataset", help="Pair photos with WHOOP Recovery and write the dataset")
+
+    research = sub.add_parser("research", help="Search for a face model of a WHOOP target and test it")
+    research.add_argument("--target", choices=["sleep", "recovery"], default="sleep",
+                          help="sleep = WHOOP Sleep Performance (default), recovery = WHOOP Recovery")
+    research.add_argument("--permutations", type=int, default=200,
+                          help="Label shuffles for the significance test (default 200)")
 
     args = parser.parse_args(argv)
     cfg = config.load()
@@ -57,6 +63,14 @@ def main(argv: list[str] | None = None) -> None:
               f"({manifest['paired_days']} days, {manifest['scored']} scored). "
               f"{manifest['unmatched']} unmatched, reasons in unmatched.csv.")
         print(f"Dataset: {cfg.dataset_output_dir}")
+
+    elif args.command == "research":
+        from face_pipeline import research as research_mod  # needs numpy: pip install -e ".[research]"
+        r = research_mod.run(cfg.dataset_output_dir, cfg.research_dir, args.target, args.permutations)
+        print(f"{r['photos']} nights. Nested MAE {r['nested_loo_mae']} vs guess-the-mean "
+              f"{r['baseline_mae_predict_mean']} (permutation p={r['permutation_p']}).")
+        print(r["verdict"])
+        print(f"Report: {cfg.research_dir / (args.target + '_report.md')}")
 
 
 def _discover(cfg: config.Config) -> list[photos.Photo]:

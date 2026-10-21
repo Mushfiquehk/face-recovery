@@ -46,6 +46,12 @@ The 0-100 readiness percentage produced by WHOOP from HRV, resting heart rate an
 ground truth for the research strand and is never shown as, or blended into, a Recovery Score.
 _Avoid_: recovery score, recovery percentage
 
+**WHOOP Sleep Performance**:
+WHOOP's 0-100 percentage of the sleep the user needed that they actually got, for the main sleep
+before a Face Scan. A second research ground truth beside WHOOP Recovery, held to the same rule:
+never shown as, or blended into, a Recovery Score.
+_Avoid_: sleep score, sleep quality
+
 ### Baselining
 
 **Absolute Signals**:

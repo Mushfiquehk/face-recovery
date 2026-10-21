@@ -15,6 +15,10 @@ struct FaceRecoveryApp: App {
         }
     }()
 
+    init() {
+        PinStore.reconcile()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

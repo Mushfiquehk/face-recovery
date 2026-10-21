@@ -51,6 +51,14 @@ struct DayDetailView: View {
                 }
             }
 
+            Section {
+                AudioReportButton(sentences: DailyReport.sentences(
+                    dayStart: day.dayStart,
+                    isScored: canonical.isScored,
+                    score: day.dailyRecoveryScore
+                ))
+            }
+
             Section("Journal") {
                 JournalPanel(dayStart: day.dayStart)
             }

@@ -4,6 +4,16 @@ struct SettingsView: View {
     @State private var apiKey: String = ""
     @State private var isTesting = false
     @State private var testResult: TestResult?
+    @AppStorage(PinStore.enabledKey) private var lockEnabled = false
+    @State private var pinFlow: PinFlowRequest?
+
+    private struct PinFlowRequest: Identifiable {
+        let mode: PinSetupFlow.Mode
+        var id: Int { switch mode { case .create: 0; case .change: 1; case .disable: 2 } }
+        static let create = PinFlowRequest(mode: .create)
+        static let change = PinFlowRequest(mode: .change)
+        static let disable = PinFlowRequest(mode: .disable)
+    }
 
     private enum TestResult {
         case success
@@ -52,6 +62,21 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    if lockEnabled {
+                        Button("Change PIN") { pinFlow = .change }
+                        Button("Turn off PIN lock", role: .destructive) { pinFlow = .disable }
+                    } else {
+                        Button("Turn on PIN lock") { pinFlow = .create }
+                    }
+                } header: {
+                    Text("PIN lock")
+                } footer: {
+                    Text(lockEnabled
+                         ? "The app asks for your 4-digit PIN when it opens. A forgotten PIN cannot be recovered: deleting the app clears it, along with your scans."
+                         : "Optional. Ask for a 4-digit PIN each time the app opens.")
+                }
+
+                Section {
                     // Shown so provenance is visible without reading the source. These are
                     // pinned in ScoringConfiguration and recorded on every Scoring Run.
                     ForEach(ScoringConfiguration.provenanceSummary, id: \.label) { item in
@@ -72,6 +97,9 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .sheet(item: $pinFlow) { request in
+                PinSetupFlow(mode: request.mode)
+            }
         }
         .onAppear {
             apiKey = KeychainStore.load() ?? ""

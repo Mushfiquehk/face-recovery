@@ -9,7 +9,7 @@ struct HistoryListView: View {
 
     private var days: [DayEntry] { DayHistory.build(from: scans) }
     private var histogram: ScoreHistogram { ScoreHistogram(days: days) }
-    private var trend: ScoreTrend { ScoreTrend(days: days) }
+    private var weeks: ScoreWeeks { ScoreWeeks(days: days) }
     private var journaledDays: Set<Date> { Set(journalEntries.map(\.dayStart)) }
 
     var body: some View {
@@ -24,7 +24,7 @@ struct HistoryListView: View {
                 } else {
                     List {
                         Section {
-                            HistoryChartsView(histogram: histogram, trend: trend)
+                            HistoryChartsView(histogram: histogram, weeks: weeks)
                         }
 
                         // Days with no Face Scan are absent rather than interpolated: a day

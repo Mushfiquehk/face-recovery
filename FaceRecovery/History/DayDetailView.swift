@@ -52,7 +52,7 @@ struct DayDetailView: View {
             }
 
             Section {
-                AudioReportButton(script: DailyReport.script(
+                AudioReportButton(sentences: DailyReport.sentences(
                     dayStart: day.dayStart,
                     isScored: canonical.isScored,
                     score: day.dailyRecoveryScore

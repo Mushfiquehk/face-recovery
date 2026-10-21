@@ -34,7 +34,7 @@ final class AudioReportPlayer: NSObject {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
         try? AVAudioSession.sharedInstance().setActive(true)
 
-        let voice = AVSpeechSynthesisVoice(language: Locale.current.identifier)
+        let voice = Self.warmestVoice()
         let utterances = sentences.map { sentence in
             let utterance = AVSpeechUtterance(string: sentence)
             utterance.voice = voice
@@ -46,6 +46,28 @@ final class AudioReportPlayer: NSObject {
         lastUtterance = utterances.last.map(ObjectIdentifier.init)
         isSpeaking = true
         utterances.forEach(synthesizer.speak)
+    }
+
+    /// The most natural installed voice for the user's language, so the report does not sound
+    /// like a robot. Premium and Enhanced voices are chosen when the user has downloaded them
+    /// (Settings > Accessibility > Spoken Content > Voices); the old novelty and Eloquence
+    /// voices are skipped. The choice depends only on what is installed, never on chance.
+    private static func warmestVoice() -> AVSpeechSynthesisVoice? {
+        let language = Locale.current.language.languageCode?.identifier ?? "en"
+        let region = Locale.current.region?.identifier
+        let natural = AVSpeechSynthesisVoice.speechVoices().filter { voice in
+            voice.language.hasPrefix(language)
+                && !voice.identifier.contains("speech.synthesis.voice")
+                && !voice.identifier.contains("eloquence")
+        }
+        let best = natural.max { rank($0, region: region) < rank($1, region: region) }
+        return best ?? AVSpeechSynthesisVoice(language: AVSpeechSynthesisVoice.currentLanguageCode())
+    }
+
+    /// Region match first, then quality, then identifier so ties break the same way each time.
+    private static func rank(_ voice: AVSpeechSynthesisVoice, region: String?) -> (Int, Int, String) {
+        let matchesRegion = region.map { voice.language.hasSuffix($0) } ?? false
+        return (matchesRegion ? 1 : 0, voice.quality.rawValue, voice.identifier)
     }
 
     func stop() {

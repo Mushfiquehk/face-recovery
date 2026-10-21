@@ -18,7 +18,7 @@ struct ScanResultView: View {
                     moverCard(signal: mover, deviation: score[deviation: mover])
                 }
 
-                AudioReportButton(script: DailyReport.script(
+                AudioReportButton(sentences: DailyReport.sentences(
                     dayStart: scan.dayStart,
                     isScored: scan.isScored,
                     score: score

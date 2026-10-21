@@ -3,13 +3,13 @@ import SwiftUI
 /// One large button that reads a single day's report aloud, and stops it on a second tap.
 /// Plain words and a full-width target, for older users.
 struct AudioReportButton: View {
-    let script: String
+    let sentences: [String]
 
     @State private var player = AudioReportPlayer()
 
     var body: some View {
         Button {
-            player.toggle(script)
+            player.toggle(sentences)
         } label: {
             Label(
                 player.isSpeaking ? "Stop the report" : "Listen to this day's report",

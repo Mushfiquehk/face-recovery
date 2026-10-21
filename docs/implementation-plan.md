@@ -86,8 +86,8 @@ FaceRecovery/
 }
 
 @Model final class ScoringRun {
-    var provider: String              // "Google AI Studio"
-    var modelId: String               // "google/gemini-3.1-flash-lite"
+    var provider: String              // "Nvidia"
+    var modelId: String               // "nvidia/nemotron-3.5-super-vl:free"
     var seed: Int
     var promptVersion: String         // "v1"
     var schemaVersion: String         // "v1"
@@ -107,8 +107,8 @@ time, so retuning recomputes history with no re-scoring cost (ADR 0002).
 
 ```json
 {
-  "model": "google/gemini-3.1-flash-lite",
-  "provider": { "order": ["Google AI Studio"], "allow_fallbacks": false },
+  "model": "nvidia/nemotron-3.5-super-vl:free",
+  "provider": { "order": ["Nvidia"], "allow_fallbacks": false },
   "seed": 42,
   "temperature": 0,
   "response_format": { "type": "json_schema", "json_schema": { "strict": true, "schema": { ... } } },
@@ -216,7 +216,7 @@ makes baselining meaningful on the first day rather than the fifteenth.
   day is worth more than any prompt tuning.
 - **Personal Team expiry.** Builds die after 7 days. Export is the only backup; there is no iCloud
   on this tier.
-- **GLM 5.3 Flash is unvalidated for this task.** Step 4 is the real go/no-go. If Signals do not
+- **Nemotron 3.5 Super VL is unvalidated for this task.** A synthetic-image smoke test confirmed it returns schema-valid JSON and marks a faceless image unusable, but nothing has been scored on a real face yet. Step 4 is the real go/no-go. It is a free endpoint, so expect occasional 429/502s; the client retries these automatically. If Signals do not
   move sensibly with obvious inputs, no amount of downstream machinery helps.
 - **OpenRouter data handling for face photographs** is unverified and needs settling at the account
   level before real scans, and a sentence in the report either way.

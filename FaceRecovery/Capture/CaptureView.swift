@@ -19,7 +19,7 @@ struct CaptureView: View {
         case framing
         case scoring(FaceScan)
         /// The scan is stored; only the Scoring Run failed, so a retry is always offered.
-        case failed(FaceScan, String)
+        case failed(FaceScan, friendly: String, detail: String)
         case scored(FaceScan)
     }
 
@@ -32,8 +32,8 @@ struct CaptureView: View {
                 case .scoring:
                     ProgressView("Scoring…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                case .failed(let scan, let message):
-                    failureView(scan: scan, message: message)
+                case .failed(let scan, let friendly, let detail):
+                    failureView(scan: scan, friendly: friendly, detail: detail)
                 case .scored(let scan):
                     ScanResultView(scan: scan, score: scoreForResult(scan)) { phase = .framing }
                 }
@@ -83,34 +83,62 @@ struct CaptureView: View {
         }
     }
 
-    private func failureView(scan: FaceScan, message: String) -> some View {
-        VStack(spacing: 18) {
-            if let image = PhotoStore.load(scan.photoFilename) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+    /// Written for older users: plain words, the reassurance first, two large buttons, and the
+    /// technical detail kept out of the way. Scrolls so it still fits at accessibility sizes.
+    private func failureView(scan: FaceScan, friendly: String, detail: String) -> some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                if let image = PhotoStore.load(scan.photoFilename) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .accessibilityHidden(true)
+                }
+
+                Label("Your photo was not scored", systemImage: "exclamationmark.triangle")
+                    .font(.title2.weight(.semibold))
+                    .multilineTextAlignment(.center)
+
+                Text(friendly)
+                    .font(.title3)
+                    .multilineTextAlignment(.center)
+
+                Text("Your photo is saved. Nothing is lost.")
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(.green)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    Task { await score(scan) }
+                } label: {
+                    Text("Try again")
+                        .font(.title3.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 60)
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button {
+                    phase = .framing
+                } label: {
+                    Text("Back to camera")
+                        .font(.title3)
+                        .frame(maxWidth: .infinity, minHeight: 60)
+                }
+                .buttonStyle(.bordered)
+
+                DisclosureGroup("Technical details") {
+                    Text(detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
+                .font(.body)
             }
-
-            Label("Scoring failed", systemImage: "exclamationmark.triangle")
-                .font(.headline)
-            Text(message)
-                .font(.footnote)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-            Text("The photo is saved. Nothing is lost by retrying.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Button("Retry scoring") {
-                Task { await score(scan) }
-            }
-            .buttonStyle(.borderedProminent)
-
-            Button("Back to camera") { phase = .framing }
+            .padding()
         }
-        .padding()
     }
 
     /// The result screen reads the new scan against the baseline of the days before it, the
@@ -156,7 +184,9 @@ struct CaptureView: View {
             try await ScoringService(modelContext: modelContext).rescore(scan)
             phase = .scored(scan)
         } catch {
-            phase = .failed(scan, error.localizedDescription)
+            let friendly = (error as? ScoringError)?.friendlyDescription
+                ?? "Something went wrong while scoring your photo."
+            phase = .failed(scan, friendly: friendly, detail: error.localizedDescription)
         }
     }
 }

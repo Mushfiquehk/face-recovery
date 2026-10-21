@@ -6,11 +6,13 @@ import Foundation
 enum ScoringConfiguration {
     static let baseURL = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
 
-    static let modelId = "z-ai/glm-5.3-flash"
+    /// Free, open-weight multimodal model. The only free vision model on OpenRouter that
+    /// supports both `seed` and `structured_outputs`, which the scoring depends on.
+    static let modelId = "nvidia/nemotron-3.5-super-vl:free"
 
-    /// Pinned with fallbacks disabled: 32 providers serve this model and they do not agree on
-    /// `seed` or `structured_outputs` support. An outage must fail the scan, not reroute it.
-    static let provider = "CoreWeave"
+    /// Pinned with fallbacks disabled so an outage fails the scan rather than rerouting it. This
+    /// model has a single endpoint, so there is nothing to reroute to anyway (ADR 0001).
+    static let provider = "Nvidia"
 
     static let seed = 42
     static let temperature = 0

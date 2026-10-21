@@ -77,6 +77,36 @@ enum ScoringError: LocalizedError {
         }
     }
 
+    /// Worth an automatic retry: the provider is busy or briefly down, and the same request may
+    /// well succeed a few seconds later.
+    var isTransient: Bool {
+        switch self {
+        case .providerUnavailable, .transport: true
+        case .providerRejected(let status, _), .http(let status, _): status == 429 || status >= 500
+        default: false
+        }
+    }
+
+    /// What to tell the user. `errorDescription` has the technical detail; this says what it
+    /// means and what to do, in plain words.
+    var friendlyDescription: String {
+        switch self {
+        case .missingAPIKey:
+            "The app needs its connection key before it can read your photo. Open Settings to add it."
+        case .imageEncodingFailed:
+            "Something went wrong preparing your photo."
+        case .providerUnavailable, .providerRejected(429, _), .providerRejected(500..., _),
+             .http(429, _), .http(500..., _):
+            "The scoring service is busy right now. This usually passes within a minute."
+        case .transport:
+            "The app could not reach the internet. Check your connection."
+        case .noRoute, .providerRejected, .http:
+            "The scoring service did not accept the photo."
+        case .emptyResponse, .malformedResponse:
+            "The scoring service gave an answer the app could not read."
+        }
+    }
+
     /// Every failure here is worth retrying by hand; none of them should silently drop a scan.
     var isRetryable: Bool {
         switch self {

@@ -43,7 +43,23 @@ struct OpenRouterClient {
         let error: Failure?
     }
 
+    /// Free endpoints rate-limit and drop requests far more often than paid ones, so transient
+    /// failures are retried here, after a short wait, before the user ever sees an error. The
+    /// request is identical each time, so a retry cannot change the Absolute Signals.
+    private static let retryDelays: [Duration] = [.seconds(3), .seconds(8)]
+
     func score(imageData: Data) async throws -> Completion {
+        for delay in Self.retryDelays {
+            do {
+                return try await scoreOnce(imageData: imageData)
+            } catch let error as ScoringError where error.isTransient {
+                try await Task.sleep(for: delay)
+            }
+        }
+        return try await scoreOnce(imageData: imageData)
+    }
+
+    private func scoreOnce(imageData: Data) async throws -> Completion {
         guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw ScoringError.missingAPIKey
         }

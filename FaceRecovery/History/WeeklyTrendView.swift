@@ -1,13 +1,15 @@
 import SwiftUI
 import Charts
 
-/// This week and last week as two line plots, for the "Weekly" tab of History.
+/// This week and last week on one set of axes, for the "Weekly" tab of History.
 ///
 /// Built to be read at a glance by older users: a plain sentence and an arrow say whether the
-/// week is up or down before any chart is read; each plot is one line with a filled circle per
-/// scored day and its number written beside it; the background is shaded green, yellow and red
-/// by band, and the band is also written in the legend, so colour is never the only cue. Both
-/// plots share one scale, so a higher line really is a better week.
+/// week is up or down before any chart is read; both weeks sit on the same days of the week, so
+/// the gap between the two lines is the answer; each week is one line with a filled circle per
+/// scored day. This week is the bold coloured line with its numbers written above each circle,
+/// last week is the thinner grey line with its numbers below. The two are told apart by weight
+/// and label as well as colour. The background is shaded green, yellow and red by band, and the
+/// bands are written in the legend, so colour is never the only cue.
 struct WeeklyTrendView: View {
     let weeks: ScoreWeeks
 
@@ -19,8 +21,8 @@ struct WeeklyTrendView: View {
             comparison
 
             if weeks.hasScores {
-                WeekPlotCard(week: weeks.thisWeek, weeks: weeks)
-                WeekPlotCard(week: weeks.lastWeek, weeks: weeks)
+                WeekKey(weeks: weeks)
+                CombinedWeekChart(weeks: weeks)
                 BandLegend()
             }
         }
@@ -64,80 +66,137 @@ struct WeeklyTrendView: View {
     }
 }
 
-// MARK: - One week
+// MARK: - Look of each week
 
-private struct WeekPlotCard: View {
-    let week: ScoreWeeks.Week
+/// How each week is drawn, in one place so the key and the chart can never disagree.
+private enum WeekStyle {
+    case thisWeek, lastWeek
+
+    var color: Color {
+        switch self {
+        case .thisWeek: .accentColor
+        case .lastWeek: .gray
+        }
+    }
+
+    var lineWidth: CGFloat { self == .thisWeek ? 4 : 2.5 }
+
+    var keyMarkerSize: CGFloat { self == .thisWeek ? 16 : 12 }
+
+    func markerSize(accessible: Bool) -> CGFloat {
+        switch self {
+        case .thisWeek: accessible ? 280 : 190
+        case .lastWeek: accessible ? 170 : 110
+        }
+    }
+}
+
+// MARK: - Key
+
+/// Says which line is which, with the dates and average of each, before the chart is read.
+private struct WeekKey: View {
     let weeks: ScoreWeeks
-
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-    private var normal: Int { Int(SleepModel.bundled.startingValue.rounded()) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            header
-
-            if week.points.isEmpty {
-                Text(week.title == "This week" ? "No scores yet this week." : "No scores from last week.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
-            chart
-                .frame(height: dynamicTypeSize.isAccessibilitySize ? 300 : 190)
-                .opacity(week.points.isEmpty ? 0.45 : 1)
-                .accessibilityHidden(true)
+            entry(weeks.thisWeek, style: .thisWeek)
+            entry(weeks.lastWeek, style: .lastWeek)
         }
-        .padding()
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityText)
+        .accessibilityElement(children: .combine)
     }
 
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
+    private func entry(_ week: ScoreWeeks.Week, style: WeekStyle) -> some View {
+        HStack(spacing: 12) {
+            // A short sample of the line itself, so the key matches what is on the chart.
+            ZStack {
+                Capsule()
+                    .fill(style.color)
+                    .frame(width: 44, height: style.lineWidth)
+                Circle()
+                    .fill(style.color)
+                    .frame(width: style.keyMarkerSize, height: style.keyMarkerSize)
+            }
+            .frame(width: 44)
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 1) {
                 Text(week.title)
                     .font(.headline)
                 Text((week.start..<week.end).formatted(.interval.month(.abbreviated).day()))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
+
             Spacer()
+
             if let average = week.average {
-                VStack(alignment: .trailing, spacing: 2) {
+                VStack(alignment: .trailing, spacing: 1) {
                     Text("\(average)")
                         .font(.title2.weight(.bold).monospacedDigit())
                     Text("average")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
+            } else {
+                Text("No scores")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
         }
     }
+}
 
-    private var accessibilityText: String {
-        guard !week.points.isEmpty else { return "\(week.title): no scores." }
-        let days = week.points
-            .map { "\($0.dayStart.formatted(.dateTime.weekday(.wide))) \($0.score)" }
-            .joined(separator: ", ")
-        return "\(week.title), average \(week.average ?? 0). \(days)."
+// MARK: - Chart
+
+private struct CombinedWeekChart: View {
+    let weeks: ScoreWeeks
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var normal: Int { Int(SleepModel.bundled.startingValue.rounded()) }
+    private var accessible: Bool { dynamicTypeSize.isAccessibilitySize }
+
+    var body: some View {
+        chart
+            .frame(height: accessible ? 340 : 240)
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityText)
     }
 
-    // MARK: Chart
+    private var accessibilityText: String {
+        [weeks.thisWeek, weeks.lastWeek].map { week in
+            guard !week.points.isEmpty else { return "\(week.title): no scores." }
+            let days = week.points
+                .map { "\($0.dayStart.formatted(.dateTime.weekday(.wide))) \($0.score)" }
+                .joined(separator: ", ")
+            return "\(week.title), average \(week.average ?? 0). \(days)."
+        }
+        .joined(separator: " ")
+    }
+
+    // MARK: Positions
 
     /// Plotted at midday so each point sits in the middle of its day rather than on the line
     /// between two days.
     private func midday(_ day: Date) -> Date { day.addingTimeInterval(12 * 3600) }
 
+    /// Last week is drawn on this week's days: its first day sits over this week's first day,
+    /// and so on, so the two lines can be compared day for day.
+    private func position(of point: ScoreWeeks.Point, in week: ScoreWeeks.Week) -> Date {
+        let index = week.days.firstIndex(of: point.dayStart) ?? 0
+        return midday(weeks.thisWeek.days[index])
+    }
+
     private var xDomain: ClosedRange<Date> {
-        week.start...week.start.addingTimeInterval(7 * 24 * 3600)
+        let start = weeks.thisWeek.start
+        return start...start.addingTimeInterval(7 * 24 * 3600)
     }
 
     private var yDomain: ClosedRange<Int> { weeks.yDomain }
 
-    /// Green, yellow and red zones behind the line, cut at the band edges.
+    /// Green, yellow and red zones behind the lines, cut at the band edges.
     private var zones: [(range: ClosedRange<Int>, color: Color)] {
         let bands: [SleepBand] = [.poor, .sufficient, .optimal]
         return bands.compactMap { band in
@@ -147,6 +206,8 @@ private struct WeekPlotCard: View {
             return (lower...upper, band.color)
         }
     }
+
+    // MARK: Marks
 
     private var chart: some View {
         Chart {
@@ -167,38 +228,15 @@ private struct WeekPlotCard: View {
                         .foregroundStyle(.secondary)
                 }
 
-            // One line per run of consecutive days, so a day with no scan is a visible gap.
-            ForEach(Array(week.runs.enumerated()), id: \.offset) { index, run in
-                ForEach(run) { point in
-                    LineMark(
-                        x: .value("Day", midday(point.dayStart)),
-                        y: .value("Score", point.score),
-                        series: .value("Run", index)
-                    )
-                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                    .foregroundStyle(Color.primary.opacity(0.55))
-                }
-            }
-
-            ForEach(week.points) { point in
-                PointMark(
-                    x: .value("Day", midday(point.dayStart)),
-                    y: .value("Score", point.score)
-                )
-                .symbol(.circle)
-                .symbolSize(dynamicTypeSize.isAccessibilitySize ? 260 : 170)
-                .foregroundStyle(SleepBand(value: point.score).color)
-                .annotation(position: .top, spacing: 4) {
-                    Text("\(point.score)")
-                        .font(.callout.weight(.bold).monospacedDigit())
-                }
-            }
+            // Last week first so this week is drawn on top of it where they cross.
+            marks(for: weeks.lastWeek, style: .lastWeek, label: .bottom)
+            marks(for: weeks.thisWeek, style: .thisWeek, label: .top)
         }
         .chartXScale(domain: xDomain)
         .chartYScale(domain: yDomain)
         .chartXAxis {
             // Letters only at large text sizes: seven day names would run into each other.
-            AxisMarks(values: week.days.map(midday)) { _ in
+            AxisMarks(values: weeks.thisWeek.days.map(midday)) { _ in
                 AxisValueLabel(format: dayFormat)
                     .font(.callout)
             }
@@ -215,10 +253,42 @@ private struct WeekPlotCard: View {
         .chartYAxisLabel("Sleep Prediction", position: .leading)
     }
 
+    /// One line per run of consecutive days, so a day with no scan is a visible gap, then a
+    /// solid circle on every scored day with its score written beside it.
+    @ChartContentBuilder
+    private func marks(for week: ScoreWeeks.Week, style: WeekStyle, label: AnnotationPosition) -> some ChartContent {
+        ForEach(Array(week.runs.enumerated()), id: \.offset) { index, run in
+            ForEach(run) { point in
+                LineMark(
+                    x: .value("Day", position(of: point, in: week)),
+                    y: .value("Score", point.score),
+                    series: .value("Run", "\(week.title)-\(index)")
+                )
+                .lineStyle(StrokeStyle(lineWidth: style.lineWidth, lineCap: .round, lineJoin: .round))
+                .foregroundStyle(style.color)
+            }
+        }
+
+        ForEach(week.points) { point in
+            PointMark(
+                x: .value("Day", position(of: point, in: week)),
+                y: .value("Score", point.score)
+            )
+            .symbol(.circle)
+            .symbolSize(style.markerSize(accessible: accessible))
+            .foregroundStyle(style.color)
+            .annotation(position: label, spacing: 4) {
+                Text("\(point.score)")
+                    .font(style == .thisWeek
+                        ? .callout.weight(.bold).monospacedDigit()
+                        : .caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(style == .thisWeek ? Color.primary : Color.secondary)
+            }
+        }
+    }
+
     private var dayFormat: Date.FormatStyle {
-        dynamicTypeSize.isAccessibilitySize
-            ? .dateTime.weekday(.narrow)
-            : .dateTime.weekday(.abbreviated)
+        accessible ? .dateTime.weekday(.narrow) : .dateTime.weekday(.abbreviated)
     }
 }
 
@@ -252,18 +322,19 @@ private struct BandLegend: View {
     }
 }
 
-/// The History header: the histogram and the weekly lines behind a two-way switch.
+/// The History header: the weekly lines and the histogram behind a two-way switch. Weekly comes
+/// first and is what opens.
 struct HistoryChartsView: View {
     let histogram: ScoreHistogram
     let weeks: ScoreWeeks
 
     private enum Tab: String, CaseIterable, Identifiable {
-        case spread = "Spread"
         case weekly = "Weekly"
+        case spread = "Spread"
         var id: Self { self }
     }
 
-    @State private var tab: Tab = .spread
+    @State private var tab: Tab = .weekly
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -273,8 +344,8 @@ struct HistoryChartsView: View {
             .pickerStyle(.segmented)
 
             switch tab {
-            case .spread: ScoreHistogramView(histogram: histogram)
             case .weekly: WeeklyTrendView(weeks: weeks)
+            case .spread: ScoreHistogramView(histogram: histogram)
             }
         }
     }

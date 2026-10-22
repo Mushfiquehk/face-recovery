@@ -31,6 +31,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.mushfique.facerecovery
         PRODUCT_NAME: Face Recovery
         GENERATE_INFOPLIST_FILE: YES
+        # Read by system audio (and the home screen); without it the speech engine logs a nil name.
+        INFOPLIST_KEY_CFBundleDisplayName: Face Recovery
         # Portrait only: the framing guide and capture protocol assume one orientation.
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UILaunchScreen_Generation: YES

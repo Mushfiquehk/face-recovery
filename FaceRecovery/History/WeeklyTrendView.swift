@@ -72,7 +72,7 @@ private struct WeekPlotCard: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    private var normal: Int { Int(ScoreTuning.default.atBaselineScore) }
+    private var normal: Int { Int(SleepModel.bundled.startingValue.rounded()) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -139,10 +139,10 @@ private struct WeekPlotCard: View {
 
     /// Green, yellow and red zones behind the line, cut at the band edges.
     private var zones: [(range: ClosedRange<Int>, color: Color)] {
-        let edges = [(0, 33, RecoveryBand.low), (34, 66, .medium), (67, 100, .high)]
-        return edges.compactMap { low, high, band in
-            let lower = max(low, yDomain.lowerBound)
-            let upper = min(high + 1, yDomain.upperBound)
+        let bands: [SleepBand] = [.poor, .sufficient, .optimal]
+        return bands.compactMap { band in
+            let lower = max(band.range.lowerBound, yDomain.lowerBound)
+            let upper = min(band.range.upperBound + 1, yDomain.upperBound)
             guard lower < upper else { return nil }
             return (lower...upper, band.color)
         }
@@ -187,7 +187,7 @@ private struct WeekPlotCard: View {
                 )
                 .symbol(.circle)
                 .symbolSize(dynamicTypeSize.isAccessibilitySize ? 260 : 170)
-                .foregroundStyle(RecoveryBand(value: point.score).color)
+                .foregroundStyle(SleepBand(value: point.score).color)
                 .annotation(position: .top, spacing: 4) {
                     Text("\(point.score)")
                         .font(.callout.weight(.bold).monospacedDigit())
@@ -212,7 +212,7 @@ private struct WeekPlotCard: View {
             }
         }
         .chartXAxisLabel("Day of the week", alignment: .center)
-        .chartYAxisLabel("Recovery Score", position: .leading)
+        .chartYAxisLabel("Sleep Prediction", position: .leading)
     }
 
     private var dayFormat: Date.FormatStyle {
@@ -226,10 +226,10 @@ private struct WeekPlotCard: View {
 
 /// What the three background colours mean, in words as well as colour.
 private struct BandLegend: View {
-    private let rows: [(band: RecoveryBand, range: String)] = [
-        (.high, "67 and up"),
-        (.medium, "34 to 66"),
-        (.low, "33 and below"),
+    private let rows: [(band: SleepBand, range: String)] = [
+        (.optimal, "85 and up"),
+        (.sufficient, "70 to 84"),
+        (.poor, "69 and below"),
     ]
 
     var body: some View {
@@ -243,7 +243,7 @@ private struct BandLegend: View {
                         .font(.callout)
                 }
             }
-            Text("The dotted line is your normal, 70. A line that sits higher means a better week.")
+            Text("The dotted line is your average night, \(Int(SleepModel.bundled.startingValue.rounded())). A line that sits higher means a better-slept week.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -2,12 +2,16 @@
 
 A photo with no EXIF capture time is never guessed from file dates: that would be the
 pipeline's equivalent of a Date-Adjusted scan, which research datasets exclude (CONTEXT.md).
+
+The app writes its photos without EXIF, so a folder exported from the app is dated from the
+`scans.json` beside it instead. Scans the app marks Date-Adjusted stay undated here.
 """
 
 from __future__ import annotations
 
 import hashlib
 import io
+import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone, tzinfo
 from pathlib import Path
@@ -32,14 +36,39 @@ class Photo:
     path: Path
     sha256: str
     captured_at: datetime | None  # timezone-aware, or None when EXIF has no capture time
-    time_source: str  # "exif+offset", "exif+assumed-zone", or "missing"
+    time_source: str  # "exif+offset", "exif+assumed-zone", "app-export", "date-adjusted" or "missing"
 
 
 def discover(folder: Path, assumed_zone: str | None = None) -> list[Photo]:
     zone: tzinfo = ZoneInfo(assumed_zone) if assumed_zone else _local_zone()
     paths = sorted(p for p in folder.rglob("*")
                    if p.is_file() and p.suffix.lower() in EXTENSIONS and not p.name.startswith("."))
-    return [_read(p, zone) for p in paths]
+    exported = app_export_scans(folder)
+    out = []
+    for p in paths:
+        photo = _read(p, zone)
+        scan = exported.get(p)
+        if photo.captured_at is None and scan and scan.get("captured_at"):
+            adjusted = bool(scan.get("is_date_adjusted"))
+            captured_at = None if adjusted else datetime.fromisoformat(scan["captured_at"].replace("Z", "+00:00"))
+            photo = Photo(path=p, sha256=photo.sha256, captured_at=captured_at,
+                          time_source="date-adjusted" if adjusted else "app-export")
+        out.append(photo)
+    return out
+
+
+def app_export_scans(folder: Path) -> dict[Path, dict]:
+    """{photo path: scan record} from every app `scans.json` under `folder`."""
+    records: dict[Path, dict] = {}
+    for manifest in folder.rglob("scans.json"):
+        try:
+            scans = json.loads(manifest.read_text()).get("scans", [])
+        except (OSError, ValueError):
+            continue
+        for scan in scans:
+            if scan.get("photo"):
+                records[manifest.parent / scan["photo"]] = scan
+    return records
 
 
 def _read(path: Path, zone: tzinfo) -> Photo:

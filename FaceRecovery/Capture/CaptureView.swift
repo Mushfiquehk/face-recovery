@@ -17,10 +17,10 @@ struct CaptureView: View {
 
     private enum Phase {
         case framing
-        case scoring(FaceScan)
-        /// The scan is stored; only the Scoring Run failed, so a retry is always offered.
-        case failed(FaceScan, String)
-        case scored(FaceScan)
+        case measuring(FaceScan)
+        /// The scan is stored; only reading the photo failed, so a retry is always offered.
+        case failed(FaceScan, friendly: String, detail: String)
+        case measured(FaceScan)
     }
 
     var body: some View {
@@ -29,13 +29,14 @@ struct CaptureView: View {
                 switch phase {
                 case .framing:
                     framingView
-                case .scoring:
-                    ProgressView("Scoring…")
+                case .measuring:
+                    ProgressView("Reading your photo…")
+                        .font(.title3)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                case .failed(let scan, let message):
-                    failureView(scan: scan, message: message)
-                case .scored(let scan):
-                    ScanResultView(scan: scan, score: scoreForResult(scan)) { phase = .framing }
+                case .failed(let scan, let friendly, let detail):
+                    failureView(scan: scan, friendly: friendly, detail: detail)
+                case .measured(let scan):
+                    ScanResultView(scan: scan, prediction: predictionForResult(scan)) { phase = .framing }
                 }
             }
             .navigationTitle("Scan")
@@ -83,41 +84,69 @@ struct CaptureView: View {
         }
     }
 
-    private func failureView(scan: FaceScan, message: String) -> some View {
-        VStack(spacing: 18) {
-            if let image = PhotoStore.load(scan.photoFilename) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+    /// Written for older users: plain words, the reassurance first, two large buttons, and the
+    /// technical detail kept out of the way. Scrolls so it still fits at accessibility sizes.
+    private func failureView(scan: FaceScan, friendly: String, detail: String) -> some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                if let image = PhotoStore.load(scan.photoFilename) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .accessibilityHidden(true)
+                }
+
+                Label("Your photo could not be read", systemImage: "exclamationmark.triangle")
+                    .font(.title2.weight(.semibold))
+                    .multilineTextAlignment(.center)
+
+                Text(friendly)
+                    .font(.title3)
+                    .multilineTextAlignment(.center)
+
+                Text("Your photo is saved. Nothing is lost.")
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(.green)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    Task { await measure(scan) }
+                } label: {
+                    Text("Try again")
+                        .font(.title3.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 60)
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button {
+                    phase = .framing
+                } label: {
+                    Text("Back to camera")
+                        .font(.title3)
+                        .frame(maxWidth: .infinity, minHeight: 60)
+                }
+                .buttonStyle(.bordered)
+
+                DisclosureGroup("Technical details") {
+                    Text(detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
+                .font(.body)
             }
-
-            Label("Scoring failed", systemImage: "exclamationmark.triangle")
-                .font(.headline)
-            Text(message)
-                .font(.footnote)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-            Text("The photo is saved. Nothing is lost by retrying.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Button("Retry scoring") {
-                Task { await score(scan) }
-            }
-            .buttonStyle(.borderedProminent)
-
-            Button("Back to camera") { phase = .framing }
+            .padding()
         }
-        .padding()
     }
 
     /// The result screen reads the new scan against the baseline of the days before it, the
     /// same arithmetic the history uses.
-    private func scoreForResult(_ scan: FaceScan) -> RecoveryScore? {
+    private func predictionForResult(_ scan: FaceScan) -> SleepPrediction? {
         let all = (try? modelContext.fetch(FetchDescriptor<FaceScan>())) ?? []
-        return RecoveryScoreCalculator.score(
+        return SleepPredictor.predict(
             for: scan,
             baseline: PersonalBaseline.make(for: scan, from: all)
         )
@@ -134,13 +163,13 @@ struct CaptureView: View {
                 isBackfilled: false
             )
             askForJournal(on: scan.dayStart)
-            await score(scan)
+            await measure(scan)
         } catch {
             phase = .framing
         }
     }
 
-    /// Opens the day's journal over the scan while it scores, so the user says how they feel
+    /// Opens the day's journal over the scan while it is read, so the user says how they feel
     /// before they see how they look (ADR 0004). Asked once a day, and only if not yet written.
     private func askForJournal(on dayStart: Date) {
         guard journalAskedOn != dayStart,
@@ -150,13 +179,17 @@ struct CaptureView: View {
         journalPrompt = JournalPrompt(dayStart: dayStart)
     }
 
-    private func score(_ scan: FaceScan) async {
-        phase = .scoring(scan)
+    private func measure(_ scan: FaceScan) async {
+        phase = .measuring(scan)
         do {
-            try await ScoringService(modelContext: modelContext).rescore(scan)
-            phase = .scored(scan)
+            try await ScoringService(modelContext: modelContext).measure(scan)
+            phase = .measured(scan)
         } catch {
-            phase = .failed(scan, error.localizedDescription)
+            phase = .failed(
+                scan,
+                friendly: "The photo could not be opened on this phone. Trying again usually fixes it.",
+                detail: String(describing: error)
+            )
         }
     }
 }

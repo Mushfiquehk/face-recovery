@@ -49,12 +49,54 @@ Recovery WHOOP already had that morning — nothing from later leaks in. The ear
 night is marked `is_canonical`, mirroring the app's Canonical Scan default.
 
 Photos with no EXIF capture time are excluded rather than dated from file timestamps, the
-equivalent of the app's Date-Adjusted exclusion. Screenshots, messaging-app saves and some edited
+equivalent of the app's Date-Adjusted exclusion. The app saves its photos without EXIF, so copy
+an app export folder (`export-<date>/`, photos plus `scans.json`) into `data/photos/` whole: its
+photos are dated from `scans.json`, and Date-Adjusted scans stay excluded. Screenshots, messaging-app saves and some edited
 exports lose EXIF; export originals from Photos ("Export Unmodified Original") to keep it.
 
 EXIF times without an offset are read in `PHOTO_TIMEZONE` (default: this Mac's zone). Photos
 taken while travelling in another zone are only correct if the camera wrote an offset, which
 iPhones do.
+
+## Sleep Model: autoresearch
+
+```sh
+.venv/bin/pip install -e ".[research]"     # numpy; measuring needs Xcode's swiftc
+.venv/bin/face-pipeline whoop-pull --days 120
+.venv/bin/face-pipeline autoresearch       # writes FaceRecovery/Analysis/SleepModel.json
+```
+
+Measures every photo in `data/photos/` with the app's own `FaceMeasurement.swift`, compiled into a
+Mac tool by `measure.py`, so research and phone never measure differently (ADR 0005). Nothing is
+sent anywhere. It then picks, per facial cue, the Signal variant that is
+
+1. **consistent**: photos taken minutes apart agree (intraclass correlation across sessions), and
+2. **robust to light**: re-measuring the photo darker, brighter, warmer and cooler moves it less
+   than a typical day-to-day difference does,
+
+and gives each kept Signal a weight. Weights start from published facial signs of sleep loss and
+only move toward your WHOOP Sleep Performance once there are 8+ usable nights with a Personal
+Baseline, by an amount chosen with leave-one-out. `data/research/autoresearch_report.md` lists
+every candidate's scores, the weights, the held-out error once there is one, and worked
+explanations: each Sleep Prediction as a starting value plus one Contribution per Signal.
+
+Scans must be taken **without glasses**, facing the camera, in white light. The measurement flags
+anything else as unusable, and only usable scans count towards the fit.
+
+## Research: does any Signal predict WHOOP?
+
+```sh
+.venv/bin/face-pipeline research                     # target: WHOOP Sleep Performance
+.venv/bin/face-pipeline research --target recovery   # target: WHOOP Recovery
+```
+
+A check on the Sleep Model rather than the model itself. Uses one photo per night (the canonical
+one, only if on-device Capture Quality accepts it), with the same on-device Signals, plus LLM
+Signals when photos were scored. It searches every family, feature subset and ridge strength, then
+reports the honest number: a **nested** leave-one-out error (each night predicted by a search that
+never saw it) against guessing your mean, plus a permutation p-value from re-running the whole
+search on shuffled targets. Output in `data/research/`: `<target>_report.md`, `_results.json` and
+`_predictions.csv`. Fewer than 8 nights refuses to run; fewer than 30 runs but is labelled as noise.
 
 ## Tests
 

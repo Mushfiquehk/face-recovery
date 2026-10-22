@@ -28,7 +28,7 @@ struct HistoryListView: View {
                         }
 
                         // Days with no Face Scan are absent rather than interpolated: a day
-                        // with no observation has no Daily Recovery Score.
+                        // with no observation has no Daily Sleep Prediction.
                         ForEach(days) { day in
                             NavigationLink(value: day.dayStart) {
                                 DayRow(day: day, hasJournal: journaledDays.contains(day.dayStart))
@@ -82,12 +82,12 @@ private struct DayRow: View {
                 Text(day.dayStart.formatted(date: .abbreviated, time: .omitted))
                     .font(.headline)
 
-                if let score = day.dailyRecoveryScore, score.isBaselineForming {
-                    Text("Baseline forming")
+                if let prediction = day.dailyPrediction, prediction.isBaselineForming {
+                    Text("Learning your usual face")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                } else if day.dailyRecoveryScore == nil {
-                    Text(day.canonical.isScored ? "Unusable Scan" : "Not scored")
+                } else if day.dailyPrediction == nil {
+                    Text(day.canonical.isMeasured ? "Photo did not count" : "Not read yet")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
@@ -112,10 +112,10 @@ private struct DayRow: View {
 
             Spacer()
 
-            if let score = day.dailyRecoveryScore {
-                Text("\(score.value)")
+            if let prediction = day.dailyPrediction {
+                Text("\(prediction.value)")
                     .font(.title2.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(score.isBaselineForming ? .secondary : .primary)
+                    .foregroundStyle(prediction.isBaselineForming ? .secondary : .primary)
             } else {
                 Image(systemName: "minus")
                     .foregroundStyle(.tertiary)

@@ -1,6 +1,8 @@
+import SwiftData
 import SwiftUI
 
 struct RootView: View {
+    @Environment(\.modelContext) private var modelContext
     @AppStorage(PinStore.enabledKey) private var lockEnabled = false
     @Environment(\.scenePhase) private var scenePhase
     /// Starts locked when the lock is on, so a cold launch asks for the PIN.
@@ -28,5 +30,8 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .background && lockEnabled { isLocked = true }
         }
+        // Scans from before on-device measurement, or from an older Measurement Version, are
+        // re-measured from their stored photos so every Sleep Prediction uses one version.
+        .task { await ScoringService(modelContext: modelContext).measureStaleScans() }
     }
 }

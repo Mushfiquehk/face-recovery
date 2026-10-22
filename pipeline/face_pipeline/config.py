@@ -29,6 +29,7 @@ class Config:
     dataset_output_dir: Path
     whoop_data_dir: Path
     scores_dir: Path
+    research_dir: Path
 
     # Photo EXIF times are local wall-clock with no zone unless the camera wrote an offset.
     # Empty means "this Mac's local zone".
@@ -59,8 +60,8 @@ def load() -> Config:
         root=root,
         openrouter_api_key=os.getenv("OPENROUTER_API_KEY") or None,
         openrouter_base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
-        scoring_model=os.getenv("SCORING_MODEL", "google/gemini-3.1-flash-lite"),
-        scoring_provider=os.getenv("SCORING_PROVIDER", "Google AI Studio"),
+        scoring_model=os.getenv("SCORING_MODEL", "nvidia/nemotron-3.5-super-vl:free"),
+        scoring_provider=os.getenv("SCORING_PROVIDER", "Nvidia"),
         scoring_seed=int(os.getenv("SCORING_SEED", "42")),
         whoop_client_id=os.getenv("WHOOP_CLIENT_ID") or None,
         whoop_client_secret=os.getenv("WHOOP_CLIENT_SECRET") or None,
@@ -70,6 +71,7 @@ def load() -> Config:
         dataset_output_dir=path("DATASET_OUTPUT_DIR", "./data/dataset"),
         whoop_data_dir=path("WHOOP_DATA_DIR", "./data/whoop"),
         scores_dir=path("SCORES_DIR", "./data/scores"),
+        research_dir=path("RESEARCH_DIR", "./data/research"),
         photo_timezone=os.getenv("PHOTO_TIMEZONE") or None,
         max_hours_after_wake=float(os.getenv("MAX_HOURS_AFTER_WAKE", "4")),
     )

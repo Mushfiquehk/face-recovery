@@ -80,12 +80,31 @@ def test_exif_dating(tmp_path):
     assert c.captured_at is None and c.time_source == "missing"
 
 
+def test_app_export_dated_from_scans_json(tmp_path):
+    export = tmp_path / "export-2026-10-04"
+    export.mkdir()
+    for name in ("live.jpg", "adjusted.jpg", "exif.jpg"):
+        write_photo(export / name, datetime(2026, 9, 1, 7, 0) if name == "exif.jpg" else None, "+00:00")
+    (export / "scans.json").write_text(json.dumps({"scans": [
+        {"photo": "live.jpg", "captured_at": "2026-09-02T11:15:00Z", "is_date_adjusted": False},
+        {"photo": "adjusted.jpg", "captured_at": "2026-09-03T11:15:00Z", "is_date_adjusted": True},
+        {"photo": "exif.jpg", "captured_at": "2026-09-09T11:15:00Z", "is_date_adjusted": False},
+    ]}))
+    found = {p.path.name: p for p in photos.discover(tmp_path, "UTC")}
+    assert found["live.jpg"].captured_at == datetime(2026, 9, 2, 11, 15, tzinfo=UTC)
+    assert found["live.jpg"].time_source == "app-export"
+    assert found["adjusted.jpg"].captured_at is None and found["adjusted.jpg"].time_source == "date-adjusted"
+    # EXIF, when present, still wins.
+    assert found["exif.jpg"].time_source == "exif+offset"
+
+
 @pytest.fixture
 def cfg(tmp_path):
     base = config.load()
     return replace(base, root=tmp_path, photo_input_dir=tmp_path / "photos",
                    dataset_output_dir=tmp_path / "dataset", whoop_data_dir=tmp_path / "whoop",
-                   scores_dir=tmp_path / "scores", photo_timezone="UTC", max_hours_after_wake=4)
+                   scores_dir=tmp_path / "scores", research_dir=tmp_path / "research",
+                   photo_timezone="UTC", max_hours_after_wake=4)
 
 
 def test_build_end_to_end(cfg):
@@ -119,6 +138,23 @@ def test_build_end_to_end(cfg):
 
     reasons = {r["source_file"]: r["reason"] for r in csv.DictReader((cfg.dataset_output_dir / "unmatched.csv").open())}
     assert reasons == {"evening.jpg": "taken more than 4h after waking", "undated.jpg": "no EXIF capture time"}
+
+
+def test_build_reuses_app_scoring_run(cfg):
+    export = cfg.photo_input_dir / "export-2026-09-01"
+    export.mkdir(parents=True)
+    write_photo(export / "scan.jpg", None)
+    (export / "scans.json").write_text(json.dumps({"scans": [{
+        "photo": "scan.jpg", "captured_at": "2026-09-01T06:45:00Z", "is_date_adjusted": False,
+        "signals": {k: 20 for k, _ in scoring.SIGNALS} | {"holistic_tiredness": 55},
+        "capture_quality": {"lighting": 60, "sharpness": 70, "face_fully_visible": True, "usable": True},
+        "scoring_run": {"provider": "CoreWeave", "model_id": "z-ai/glm", "prompt_version": "v1", "schema_version": "v1"},
+    }]}))
+    manifest = dataset.build(cfg, photos.discover(cfg.photo_input_dir, "UTC"), list(BY_SLEEP.values()), SLEEPS)
+    assert (manifest["paired"], manifest["scored"]) == (1, 1)
+    row = next(csv.DictReader((cfg.dataset_output_dir / "dataset.csv").open()))
+    assert row["time_source"] == "app-export" and row["holistic_tiredness"] == "55"
+    assert row["scoring_model"] == "z-ai/glm" and row["usable"] == "True"
 
 
 class FakeResponse:

@@ -36,7 +36,7 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_NSCameraUsageDescription: >-
           Face Recovery uses the front camera to take your morning face scan.
-          Photos stay on this device except when sent for scoring.
+          Photos are measured on this device and never leave it.
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: >-
           Face Recovery reads photos you choose in order to backfill past days,
           using each photo's capture date.

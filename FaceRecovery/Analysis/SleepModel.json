@@ -1,0 +1,57 @@
+{
+  "version": "s1",
+  "measurementVersion": "m1",
+  "fittedAt": "2026-10-21T23:52:12Z",
+  "method": "prior only: 0 usable night(s) with a Personal Baseline and WHOOP Sleep Performance; fitting starts at 8",
+  "nightsUsed": 0,
+  "startingValue": 58.7,
+  "startingValueNights": 90,
+  "contributionClamp": 3.0,
+  "signals": [
+    {
+      "id": "brow_gap",
+      "name": "Upper eyelid position",
+      "higherMeans": "upper eyelids lower",
+      "lowerMeans": "upper eyelids higher",
+      "typicalDeviation": 0.025762,
+      "weight": -2,
+      "priorWeight": -2
+    },
+    {
+      "id": "under_eye_shadow",
+      "name": "Darkness under the eyes",
+      "higherMeans": "darker under the eyes",
+      "lowerMeans": "lighter under the eyes",
+      "typicalDeviation": 8.547413,
+      "weight": -4,
+      "priorWeight": -4
+    },
+    {
+      "id": "under_eye_blue",
+      "name": "Blue tint under the eyes",
+      "higherMeans": "bluer under the eyes",
+      "lowerMeans": "less blue under the eyes",
+      "typicalDeviation": 0.115613,
+      "weight": -2,
+      "priorWeight": -2
+    },
+    {
+      "id": "sclera_vs_skin_redness",
+      "name": "Redness of the eyes",
+      "higherMeans": "redder eyes",
+      "lowerMeans": "whiter eyes",
+      "typicalDeviation": 0.229494,
+      "weight": -3,
+      "priorWeight": -3
+    },
+    {
+      "id": "skin_chroma",
+      "name": "Skin colour",
+      "higherMeans": "more colour in the skin",
+      "lowerMeans": "paler skin",
+      "typicalDeviation": 5.481145,
+      "weight": 2,
+      "priorWeight": 2
+    }
+  ]
+}

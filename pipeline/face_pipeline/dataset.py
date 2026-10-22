@@ -18,7 +18,7 @@ from pathlib import Path
 
 from face_pipeline import scoring
 from face_pipeline.config import Config
-from face_pipeline.photos import Photo, to_jpeg
+from face_pipeline.photos import Photo, app_export_scans, to_jpeg
 
 WAKE_TOLERANCE = timedelta(minutes=30)
 
@@ -59,20 +59,24 @@ def build(cfg: Config, photos: list[Photo], recoveries: list[dict], sleeps: list
     images.mkdir(parents=True)
 
     by_sleep = {r["sleep_id"]: r for r in recoveries if r.get("sleep_id")}
+    exported = app_export_scans(cfg.photo_input_dir)
     rows: list[dict] = []
     unmatched: list[dict] = []
 
     for photo in sorted(photos, key=lambda p: p.captured_at or datetime.max.replace(tzinfo=timezone.utc)):
         source = str(photo.path.relative_to(cfg.photo_input_dir))
         if photo.captured_at is None:
-            unmatched.append({"source_file": source, "captured_at": "", "reason": "no EXIF capture time"})
+            reason = ("Date-Adjusted in the app" if photo.time_source == "date-adjusted"
+                      else "no EXIF capture time")
+            unmatched.append({"source_file": source, "captured_at": "", "reason": reason})
             continue
         result = pair(photo.captured_at, sleeps, by_sleep, cfg.max_hours_after_wake)
         if result.reason:
             unmatched.append({"source_file": source, "captured_at": photo.captured_at.isoformat(),
                               "reason": result.reason})
             continue
-        rows.append(_row(cfg, photo, source, result.sleep, result.recovery, images))
+        rows.append(_row(cfg, photo, source, result.sleep, result.recovery, images,
+                         exported.get(photo.path)))
 
     # Canonical Scan: the earliest photo paired to each night, mirroring the app's default.
     seen: set[str] = set()
@@ -104,7 +108,8 @@ def build(cfg: Config, photos: list[Photo], recoveries: list[dict], sleeps: list
     return manifest
 
 
-def _row(cfg: Config, photo: Photo, source: str, sleep: dict, recovery: dict, images: Path) -> dict:
+def _row(cfg: Config, photo: Photo, source: str, sleep: dict, recovery: dict, images: Path,
+         app_scan: dict | None = None) -> dict:
     local = photo.captured_at
     wake = parse_ts(sleep["end"])
     name = f"{local:%Y-%m-%d_%H%M%S}_{photo.sha256[:8]}.jpg"
@@ -112,7 +117,13 @@ def _row(cfg: Config, photo: Photo, source: str, sleep: dict, recovery: dict, im
 
     rec = recovery["score"]
     sleep_score = sleep.get("score") or {}
-    scored = scoring.load_cached(cfg, photo) or {}
+    # The pipeline's own Scoring Run wins; otherwise reuse the one the app made, if it was exported.
+    app_scan = app_scan or {}
+    scored = scoring.load_cached(cfg, photo) or {
+        "signals": app_scan.get("signals") or {},
+        "capture_quality": app_scan.get("capture_quality") or {},
+        "scoring_run": app_scan.get("scoring_run") or {},
+    }
     signals = scored.get("signals", {})
     quality = scored.get("capture_quality", {})
     run = scored.get("scoring_run", {})

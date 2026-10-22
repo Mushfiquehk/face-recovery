@@ -1,6 +1,6 @@
 import Foundation
 
-/// How many days landed in each ten-point slice of the Recovery Score.
+/// How many days landed in each ten-point slice of the Sleep Prediction.
 ///
 /// Only personalised scores are counted. A Baseline Forming score is read straight from Absolute
 /// Signals on a different footing, so mixing it in would blur two different measures into one
@@ -47,8 +47,8 @@ struct ScoreHistogram {
     /// `days` must be newest first, as `DayHistory.build` returns them.
     init(days: [DayEntry]) {
         let scores = days.compactMap { day -> Int? in
-            guard let score = day.dailyRecoveryScore, !score.isBaselineForming else { return nil }
-            return score.value
+            guard let prediction = day.dailyPrediction, !prediction.isBaselineForming else { return nil }
+            return prediction.value
         }
         self.init(scores: scores)
     }

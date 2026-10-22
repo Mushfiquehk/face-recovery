@@ -1,6 +1,6 @@
 import Foundation
 
-/// This calendar week and last week of Recovery Scores, for two line plots that share one
+/// This calendar week and last week of Sleep Predictions, for two line plots that share one
 /// scale so they can be compared at a glance.
 ///
 /// Like `ScoreHistogram`, only personalised scores count. A day with no usable score is a gap,
@@ -74,8 +74,8 @@ struct ScoreWeeks {
     /// `days` must be newest first, as `DayHistory.build` returns them.
     init(days: [DayEntry], now: Date = .now, calendar: Calendar = .current) {
         let scored = days.compactMap { day -> Point? in
-            guard let score = day.dailyRecoveryScore, !score.isBaselineForming else { return nil }
-            return Point(dayStart: day.dayStart, score: score.value)
+            guard let prediction = day.dailyPrediction, !prediction.isBaselineForming else { return nil }
+            return Point(dayStart: day.dayStart, score: prediction.value)
         }
         .reversed()
 
@@ -114,7 +114,7 @@ struct ScoreWeeks {
     /// A vertical range that fits the scores with room for their labels, always includes the
     /// user's normal, and never shrinks below 30 points so a quiet week is not exaggerated.
     static func scale(for scores: [Int]) -> (ClosedRange<Int>, [Int]) {
-        let normal = Int(ScoreTuning.default.atBaselineScore)
+        let normal = Int(SleepModel.bundled.startingValue.rounded())
         let low = (scores + [normal]).min() ?? normal
         let high = (scores + [normal]).max() ?? normal
 

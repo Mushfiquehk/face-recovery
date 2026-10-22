@@ -19,7 +19,7 @@ struct ExportView: View {
                     LabeledContent("Research-grade", value: "\(researchGradeCount)")
                     LabeledContent("Journal entries", value: "\(journalEntries.count)")
                 } footer: {
-                    Text("Research-grade means usable and not Date-Adjusted. All scans are exported; the pipeline filters.")
+                    Text("Research-grade means the photo counted and its date was not changed by hand. All scans are exported; the pipeline filters.")
                 }
 
                 Section {
@@ -38,7 +38,7 @@ struct ExportView: View {
                         Text(errorMessage).font(.caption).foregroundStyle(.red)
                     }
                 } footer: {
-                    Text("Writes scans.json with every Absolute Signal, Capture Quality, Scoring Run and Journal Entry, plus the photo files. Recovery Scores and baselines are not exported — the pipeline recomputes them so the app and the analysis can never disagree.")
+                    Text("Writes scans.json with every measurement, photo check and Journal Entry, plus the photo files. Sleep Predictions and baselines are not exported — the pipeline recomputes them so the app and the analysis can never disagree.")
                 }
 
                 Section {

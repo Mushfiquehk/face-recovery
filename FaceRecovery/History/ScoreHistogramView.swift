@@ -1,7 +1,7 @@
 import SwiftUI
 import Charts
 
-/// The spread of Recovery Scores across all scored days, for the top of History.
+/// The spread of Sleep Predictions across all measured days, for the top of History.
 ///
 /// Built for older users: a plain sentence says what the shape means before any chart is read,
 /// text sizes follow the system setting, and the chart is one colour with the latest day marked
@@ -97,7 +97,7 @@ struct ScoreHistogramView: View {
                 }
             }
         }
-        .chartXAxisLabel("Recovery Score", alignment: .center)
+        .chartXAxisLabel("Sleep Prediction", alignment: .center)
         .chartYAxisLabel("Days", position: .leading)
     }
 }

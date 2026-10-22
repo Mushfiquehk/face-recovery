@@ -36,25 +36,4 @@ enum PhotoStore {
     static func load(_ filename: String) -> UIImage? {
         UIImage(contentsOfFile: url(for: filename).path)
     }
-
-    /// The upload copy: long edge capped and JPEG-compressed per ScoringConfiguration.
-    /// The stored photo keeps its full resolution so a future re-score is not degraded twice.
-    static func scoringPayload(for image: UIImage) throws -> Data {
-        let longEdge = max(image.size.width, image.size.height)
-        let scale = longEdge > ScoringConfiguration.imageLongEdge
-            ? ScoringConfiguration.imageLongEdge / longEdge
-            : 1
-        let target = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 1
-        let resized = UIGraphicsImageRenderer(size: target, format: format).image { _ in
-            image.draw(in: CGRect(origin: .zero, size: target))
-        }
-
-        guard let data = resized.jpegData(compressionQuality: ScoringConfiguration.jpegQuality) else {
-            throw ScoringError.imageEncodingFailed
-        }
-        return data
-    }
 }

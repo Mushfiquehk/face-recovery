@@ -3,13 +3,18 @@ import Foundation
 /// Writes `export-<date>/` containing `scans.json` and the photo files. `scans.json` also
 /// carries every Journal Entry, joined to scans by the local `day` both records share.
 ///
-/// Derived values — Recovery Scores, Personal Baselines — are deliberately not exported. The
-/// Python pipeline recomputes them from the same Absolute Signals, so the app and the analysis
-/// cannot drift into disagreeing about how a score was produced.
+/// Derived values — Sleep Predictions, Personal Baselines — are deliberately not exported. The
+/// Python pipeline recomputes them from the same Absolute Signals and the named Sleep Model, so
+/// the app and the analysis cannot drift into disagreeing about how a prediction was produced.
 enum ExportBuilder {
+    /// v2 added each scan's on-device `measurement` and the document's `sleep_model_version`.
+    static let schemaVersion = "v2"
+
     struct Document: Encodable {
         let exportedAt: Date
         let schemaVersion: String
+        /// The Sleep Model the app was predicting with when this was exported.
+        let sleepModelVersion: String
         let scans: [Record]
         let journalEntries: [JournalRecord]
     }
@@ -52,9 +57,22 @@ enum ExportBuilder {
         let canonicalDesignatedAt: Date?
         /// Filename of the photo in the same folder as `scans.json`.
         let photo: String
+        /// On-device Absolute Signals and Capture Quality (ADR 0005).
+        let measurement: Measurement?
+        // LLM Signals, Capture Quality and Scoring Run, on scans from before on-device measurement.
         let signals: Signals?
         let captureQuality: Quality?
         let scoringRun: Run?
+
+        struct Measurement: Encodable {
+            let version: String
+            let measuredAt: Date
+            let usable: Bool
+            let problems: [String]
+            /// Signal id → value; empty when no face was found.
+            let signals: [String: Double]
+            let quality: FaceMeasurement.Quality?
+        }
     }
 
     /// A Journal Entry exactly as the user gave it. Ratings are the 1-5 raw values; skipped
@@ -96,7 +114,8 @@ enum ExportBuilder {
 
         let document = Document(
             exportedAt: now,
-            schemaVersion: ScoringConfiguration.schemaVersion,
+            schemaVersion: schemaVersion,
+            sleepModelVersion: SleepModel.bundled.version,
             scans: records,
             journalEntries: journalEntries
                 .sorted { $0.dayStart < $1.dayStart }
@@ -126,6 +145,17 @@ enum ExportBuilder {
             isCanonical: scan.isCanonical,
             canonicalDesignatedAt: scan.canonicalDesignatedAt,
             photo: scan.photoFilename,
+            measurement: scan.measurement.map {
+                let measured = $0.measurement
+                return Record.Measurement(
+                    version: $0.version,
+                    measuredAt: $0.measuredAt,
+                    usable: $0.isUsable,
+                    problems: $0.problems,
+                    signals: measured?.signals ?? [:],
+                    quality: measured?.quality
+                )
+            },
             signals: scan.signals.map {
                 Record.Signals(
                     underEyeDarkness: $0.underEyeDarkness,

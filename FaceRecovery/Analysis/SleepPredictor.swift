@@ -3,8 +3,14 @@ import Foundation
 /// How much one Signal moved a Sleep Prediction, given how far it was from the user's usual.
 struct Contribution: Identifiable {
     let signal: SleepModel.SignalWeight
+    /// The Absolute Signal measured on this scan.
+    let value: Double
+    /// The Personal Baseline median it was compared with.
+    let usual: Double
     /// Today's value minus the Personal Baseline, in typical day-to-day differences.
     let deviation: Double
+    /// The deviation after the Sleep Model's clamp: what the weight was actually multiplied by.
+    let countedDeviation: Double
     /// Points added to (positive) or taken from (negative) the Sleep Prediction.
     let points: Double
 
@@ -12,6 +18,8 @@ struct Contribution: Identifiable {
     var words: String { deviation >= 0 ? signal.higherMeans : signal.lowerMeans }
     /// Too small a change to mention.
     var isSteady: Bool { abs(deviation) < 0.5 }
+    /// The deviation was larger than any one Signal is allowed to count for.
+    var isClamped: Bool { countedDeviation != deviation }
 }
 
 /// A Sleep Prediction with the arithmetic that produced it, so every point can be shown.
@@ -51,7 +59,14 @@ enum SleepPredictor {
                 guard let value = signals[weight.id], let usual = baseline.medians[weight.id] else { continue }
                 let deviation = (value - usual) / weight.typicalDeviation
                 let clamped = min(max(deviation, -model.contributionClamp), model.contributionClamp)
-                contributions.append(Contribution(signal: weight, deviation: deviation, points: weight.weight * clamped))
+                contributions.append(Contribution(
+                    signal: weight,
+                    value: value,
+                    usual: usual,
+                    deviation: deviation,
+                    countedDeviation: clamped,
+                    points: weight.weight * clamped
+                ))
             }
         }
 

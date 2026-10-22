@@ -57,7 +57,7 @@ struct BackfillView: View {
 
                 if let progress {
                     Section("Progress") {
-                        Text("\(progress.completed) of \(progress.total) scored")
+                        Text("\(progress.completed) of \(progress.total) read")
                         ForEach(progress.failures, id: \.self) { failure in
                             Text(failure).font(.caption).foregroundStyle(.red)
                         }
@@ -148,8 +148,8 @@ struct BackfillView: View {
         candidates = loaded.sorted { $0.date < $1.date }
     }
 
-    /// Sequential, not concurrent: 30 simultaneous requests to a single pinned provider is the
-    /// fastest way to get rate-limited, and a backfill is not time-critical.
+    /// Sequential, not concurrent: each photo is measured on the device, and reading thirty
+    /// full-resolution photos at once would only compete for the same memory.
     private func scanAll() async {
         progress = Progress(completed: 0, total: candidates.count, failures: [])
         let service = ScoringService(modelContext: modelContext)
@@ -163,7 +163,7 @@ struct BackfillView: View {
                     isDateAdjusted: candidate.isDateAdjusted,
                     isBackfilled: true
                 )
-                candidates[index].outcome = "Scored"
+                candidates[index].outcome = "Read"
             } catch {
                 candidates[index].outcome = "Failed"
                 progress?.failures.append(

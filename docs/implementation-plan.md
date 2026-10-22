@@ -1,5 +1,8 @@
 # v1 Implementation Plan
 
+> Historical. The LLM scoring, Recovery Score and OpenRouter key described here were replaced by
+> on-device measurement and a Sleep Prediction; see [ADR 0005](./adr/0005-on-device-sleep-prediction.md).
+
 Scope, sequencing and concrete design for the first build that runs on a phone. Terms are used
 exactly as defined in [`CONTEXT.md`](../CONTEXT.md); the non-obvious choices are justified in
 [`docs/adr/`](./adr).

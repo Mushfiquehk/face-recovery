@@ -95,7 +95,7 @@ CUES = (
         Candidate("mouth_corner_droop", -1, "mouth corners lower", "mouth corners higher"),
     )),
     Cue("Face fullness", 1, (
-        Candidate("face_width", -1, "face looks fuller", "face looks slimmer"),
+        Candidate("face_width", -1, "a fuller face", "a slimmer face"),
     )),
 )
 

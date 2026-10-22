@@ -39,8 +39,9 @@ struct FramingGuide: View {
                     .path(in: oval)
                     .stroke(.white.opacity(0.9), style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
 
-                Text("Fill the oval. Face the light, same spot each morning.")
-                    .font(.footnote)
+                Text("Glasses off. Fill the oval and face the light, same spot each morning.")
+                    .font(.callout)
+                    .multilineTextAlignment(.center)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)

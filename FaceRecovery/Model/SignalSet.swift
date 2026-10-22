@@ -1,9 +1,9 @@
 import Foundation
 import SwiftData
 
-/// The five directly observable facial characteristics the LLM rates for a Face Scan.
-/// `holisticTiredness` is rated and baselined alongside them but is not a Signal and is
-/// deliberately excluded from the Recovery Score (CONTEXT.md, ADR 0002).
+/// The five facial characteristics an image LLM rated for Face Scans before on-device
+/// measurement (LLM Signals in CONTEXT.md). Kept for history and export; never part of a Sleep
+/// Prediction (ADR 0005).
 enum Signal: String, CaseIterable, Identifiable, Codable {
     case underEyeDarkness
     case underEyePuffiness
@@ -46,8 +46,7 @@ final class SignalSet {
     var eyeRedness: Int
     var skinDullness: Int
 
-    /// The LLM's overall impression of how tired the face looks. Stored and baselined,
-    /// never part of the Recovery Score.
+    /// The LLM's overall impression of how tired the face looked.
     var holisticTiredness: Int
 
     var scan: FaceScan?

@@ -17,10 +17,10 @@ struct CaptureView: View {
 
     private enum Phase {
         case framing
-        case scoring(FaceScan)
-        /// The scan is stored; only the Scoring Run failed, so a retry is always offered.
+        case measuring(FaceScan)
+        /// The scan is stored; only reading the photo failed, so a retry is always offered.
         case failed(FaceScan, friendly: String, detail: String)
-        case scored(FaceScan)
+        case measured(FaceScan)
     }
 
     var body: some View {
@@ -29,13 +29,14 @@ struct CaptureView: View {
                 switch phase {
                 case .framing:
                     framingView
-                case .scoring:
-                    ProgressView("Scoring…")
+                case .measuring:
+                    ProgressView("Reading your photo…")
+                        .font(.title3)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .failed(let scan, let friendly, let detail):
                     failureView(scan: scan, friendly: friendly, detail: detail)
-                case .scored(let scan):
-                    ScanResultView(scan: scan, score: scoreForResult(scan)) { phase = .framing }
+                case .measured(let scan):
+                    ScanResultView(scan: scan, prediction: predictionForResult(scan)) { phase = .framing }
                 }
             }
             .navigationTitle("Scan")
@@ -97,7 +98,7 @@ struct CaptureView: View {
                         .accessibilityHidden(true)
                 }
 
-                Label("Your photo was not scored", systemImage: "exclamationmark.triangle")
+                Label("Your photo could not be read", systemImage: "exclamationmark.triangle")
                     .font(.title2.weight(.semibold))
                     .multilineTextAlignment(.center)
 
@@ -111,7 +112,7 @@ struct CaptureView: View {
                     .multilineTextAlignment(.center)
 
                 Button {
-                    Task { await score(scan) }
+                    Task { await measure(scan) }
                 } label: {
                     Text("Try again")
                         .font(.title3.weight(.semibold))
@@ -143,9 +144,9 @@ struct CaptureView: View {
 
     /// The result screen reads the new scan against the baseline of the days before it, the
     /// same arithmetic the history uses.
-    private func scoreForResult(_ scan: FaceScan) -> RecoveryScore? {
+    private func predictionForResult(_ scan: FaceScan) -> SleepPrediction? {
         let all = (try? modelContext.fetch(FetchDescriptor<FaceScan>())) ?? []
-        return RecoveryScoreCalculator.score(
+        return SleepPredictor.predict(
             for: scan,
             baseline: PersonalBaseline.make(for: scan, from: all)
         )
@@ -162,13 +163,13 @@ struct CaptureView: View {
                 isBackfilled: false
             )
             askForJournal(on: scan.dayStart)
-            await score(scan)
+            await measure(scan)
         } catch {
             phase = .framing
         }
     }
 
-    /// Opens the day's journal over the scan while it scores, so the user says how they feel
+    /// Opens the day's journal over the scan while it is read, so the user says how they feel
     /// before they see how they look (ADR 0004). Asked once a day, and only if not yet written.
     private func askForJournal(on dayStart: Date) {
         guard journalAskedOn != dayStart,
@@ -178,15 +179,17 @@ struct CaptureView: View {
         journalPrompt = JournalPrompt(dayStart: dayStart)
     }
 
-    private func score(_ scan: FaceScan) async {
-        phase = .scoring(scan)
+    private func measure(_ scan: FaceScan) async {
+        phase = .measuring(scan)
         do {
-            try await ScoringService(modelContext: modelContext).rescore(scan)
-            phase = .scored(scan)
+            try await ScoringService(modelContext: modelContext).measure(scan)
+            phase = .measured(scan)
         } catch {
-            let friendly = (error as? ScoringError)?.friendlyDescription
-                ?? "Something went wrong while scoring your photo."
-            phase = .failed(scan, friendly: friendly, detail: error.localizedDescription)
+            phase = .failed(
+                scan,
+                friendly: "The photo could not be opened on this phone. Trying again usually fixes it.",
+                detail: String(describing: error)
+            )
         }
     }
 }

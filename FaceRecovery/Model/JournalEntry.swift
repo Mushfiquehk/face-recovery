@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// How recovered the user says they feel. A self-report, never blended into the Recovery Score
+/// How recovered the user says they feel. A self-report, never blended into the Sleep Prediction
 /// (CONTEXT.md, ADR 0004).
 enum PerceivedRecovery: Int, CaseIterable, Identifiable {
     case exhausted = 1, tired, okay, good, great
@@ -114,7 +114,7 @@ enum JournalFactor: String, CaseIterable, Identifiable {
 
 /// The user's own account of one day: Perceived Recovery, sleep, medicines and anything else
 /// they note. At most one per day, matched to that day's Face Scans by `dayStart`. Never sent
-/// to the LLM and never part of the Recovery Score.
+/// anywhere and never part of the Sleep Prediction.
 @Model
 final class JournalEntry {
     /// Local start of the day this entry describes, the same key as `FaceScan.dayStart`.
@@ -123,7 +123,7 @@ final class JournalEntry {
     var createdAt: Date
     var updatedAt: Date
 
-    /// True when the entry was answered straight after the shutter, before any Recovery Score
+    /// True when the entry was answered straight after the shutter, before any Sleep Prediction
     /// for the day had been shown. Any later edit clears it, because by then the user has seen
     /// the number and their answer may be anchored by it (ADR 0004).
     var isBlindToScore: Bool

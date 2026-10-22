@@ -1,8 +1,8 @@
 import Foundation
 import SwiftData
 
-/// A single photo of the user's face submitted for scoring, with the date and time it was
-/// captured. Scans are never overwritten or deleted.
+/// A single photo of the user's face, with the date and time it was captured, measured on the
+/// device. Scans are never overwritten or deleted.
 @Model
 final class FaceScan {
     /// Stable identity, also used to name the photo file on disk.
@@ -32,6 +32,12 @@ final class FaceScan {
     /// default (earliest of the day) can be told apart from a deliberate choice.
     var canonicalDesignatedAt: Date?
 
+    /// Absolute Signals and Capture Quality measured on the device (ADR 0005).
+    @Relationship(deleteRule: .cascade, inverse: \ScanMeasurement.scan)
+    var measurement: ScanMeasurement?
+
+    // LLM Signals, Capture Quality and Scoring Run from before on-device measurement. Kept for
+    // history and export; they never feed a Sleep Prediction.
     @Relationship(deleteRule: .cascade, inverse: \SignalSet.scan)
     var signals: SignalSet?
 
@@ -59,13 +65,13 @@ final class FaceScan {
         self.canonicalDesignatedAt = nil
     }
 
-    /// A scan has been scored when it has both Absolute Signals and the Scoring Run that
-    /// produced them. Signals without their provenance are meaningless (CONTEXT.md).
-    var isScored: Bool { signals != nil && scoringRun != nil }
+    /// Measured by the current Measurement Version. A scan measured by an older version is
+    /// re-measured rather than mixed with new ones (CONTEXT.md).
+    var isMeasured: Bool { measurement?.version == FaceMeasurement.currentVersion }
 
     /// Usable scans are the only ones that feed the Personal Baseline and trends.
-    /// An unscored scan is not usable because nothing has judged its Capture Quality yet.
-    var isUsable: Bool { isScored && (quality?.isUsable ?? false) }
+    /// An unmeasured scan is not usable because nothing has judged its Capture Quality yet.
+    var isUsable: Bool { isMeasured && (measurement?.isUsable ?? false) }
 
     /// Research exports default to EXIF-dated scans only.
     var isResearchGrade: Bool { isUsable && !isDateAdjusted }

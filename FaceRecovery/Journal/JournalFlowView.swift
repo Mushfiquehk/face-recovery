@@ -42,7 +42,7 @@ struct JournalFlowView: View {
     @AccessibilityFocusState private var isQuestionFocused: Bool
 
     /// - Parameter isBlindToScore: true only when presented straight after the shutter, before
-    ///   any Recovery Score for the day has been shown (ADR 0004).
+    ///   any Sleep Prediction for the day has been shown (ADR 0004).
     init(dayStart: Date, existing: JournalEntry?, mode: Mode = .guided, isBlindToScore: Bool = false) {
         self.dayStart = dayStart
         self.existing = existing

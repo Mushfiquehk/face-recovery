@@ -93,6 +93,7 @@ enum FaceMeasurer {
         let handler = VNImageRequestHandler(cgImage: image, orientation: .up)
         let rectanglesRequest = VNDetectFaceRectanglesRequest()
         rectanglesRequest.revision = VNDetectFaceRectanglesRequestRevision3
+        runOnCPUInSimulator(rectanglesRequest)
         try handler.perform([rectanglesRequest])
         guard let found = rectanglesRequest.results?.max(by: { area($0.boundingBox) < area($1.boundingBox) }) else {
             throw FaceMeasurementError.noFace
@@ -101,8 +102,10 @@ enum FaceMeasurer {
         landmarksRequest.revision = VNDetectFaceLandmarksRequestRevision3
         landmarksRequest.constellation = .constellation76Points
         landmarksRequest.inputFaceObservations = [found]
+        runOnCPUInSimulator(landmarksRequest)
         let qualityRequest = VNDetectFaceCaptureQualityRequest()
         qualityRequest.inputFaceObservations = [found]
+        runOnCPUInSimulator(qualityRequest)
         try handler.perform([landmarksRequest, qualityRequest])
         let captureQuality = Double(qualityRequest.results?.first?.faceCaptureQuality ?? 0)
 
@@ -264,6 +267,20 @@ enum FaceMeasurer {
     }
 
     // MARK: - Helpers
+
+    /// The iOS Simulator cannot create Vision's GPU or Neural Engine context ("Could not create
+    /// inference context"), so there the requests run on the CPU. Devices and the Mac tool are
+    /// left on Vision's own choice.
+    private static func runOnCPUInSimulator(_ request: VNRequest) {
+        #if targetEnvironment(simulator)
+        guard let stages = try? request.supportedComputeStageDevices else { return }
+        for (stage, devices) in stages {
+            if let cpu = devices.first(where: { if case .cpu = $0 { true } else { false } }) {
+                request.setComputeDevice(cpu, for: stage)
+            }
+        }
+        #endif
+    }
 
     private static func area(_ r: CGRect) -> Double { r.width * r.height }
     private static func degrees(_ radians: NSNumber?) -> Double { (radians?.doubleValue ?? 0) * 180 / .pi }

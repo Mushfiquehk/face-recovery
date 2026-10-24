@@ -3,18 +3,6 @@ import SwiftData
 
 @main
 struct FaceRecoveryApp: App {
-    /// Local store only. There is no iCloud on a Personal Team, so Export is the only backup.
-    let container: ModelContainer = {
-        do {
-            return try ModelContainer(
-                for: FaceScan.self, ScanMeasurement.self, SignalSet.self, CaptureQuality.self,
-                ScoringRun.self, JournalEntry.self
-            )
-        } catch {
-            fatalError("Could not open the scan store: \(error)")
-        }
-    }()
-
     init() {
         PinStore.reconcile()
     }
@@ -23,6 +11,6 @@ struct FaceRecoveryApp: App {
         WindowGroup {
             RootView()
         }
-        .modelContainer(container)
+        .modelContainer(ScanStore.container)
     }
 }

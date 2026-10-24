@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage(PinStore.enabledKey) private var lockEnabled = false
+    @AppStorage(FamilyUpdate.Setting.enabled.rawValue)
+    private var familyUpdatesEnabled = FamilyUpdate.Setting.enabled.defaultValue
     @State private var pinFlow: PinFlowRequest?
 
     private let model = SleepModel.bundled
@@ -33,6 +35,18 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        FamilyUpdateSettingsView()
+                    } label: {
+                        LabeledContent("Family updates", value: familyUpdatesEnabled ? "On" : "Off")
+                    }
+                } header: {
+                    Text("Sharing")
+                } footer: {
+                    Text("Send a short daily message to family or a friend.")
+                }
+
+                Section {
                     // Shown so provenance is visible without reading the source. Every scan is
                     // re-measured when the Measurement Version changes, so versions never mix.
                     LabeledContent("Measurement", value: FaceMeasurement.currentVersion)
@@ -51,7 +65,9 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Text("Your photos are measured on this phone and never leave it. Nothing is sent to any server.")
+                    Text(familyUpdatesEnabled
+                         ? "Your photos are measured on this phone and never leave it. Nothing is sent to any server. Family updates go out as a text from your own Messages app, without photos or notes."
+                         : "Your photos are measured on this phone and never leave it. Nothing is sent to any server.")
                         .font(.footnote)
                 } header: {
                     Text("Data handling")

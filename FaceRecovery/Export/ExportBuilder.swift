@@ -91,6 +91,18 @@ enum ExportBuilder {
         let notes: String
     }
 
+    /// An export is every photo and Journal Entry in plain files, so it lives only as long as the
+    /// share sheet showing it (ADR 0007). This catches any folder a crash or force-quit left in
+    /// the temporary directory. Call at launch.
+    static func removeLeftoverExports() {
+        let manager = FileManager.default
+        let temporary = manager.temporaryDirectory
+        for name in (try? manager.contentsOfDirectory(atPath: temporary.path)) ?? []
+        where name.hasPrefix("export-") {
+            try? manager.removeItem(at: temporary.appendingPathComponent(name, isDirectory: true))
+        }
+    }
+
     /// Builds the export folder and returns its URL, ready for the share sheet.
     static func build(scans: [FaceScan], journalEntries: [JournalEntry], now: Date = Date()) throws -> URL {
         let stamp = ISO8601DateFormatter.exportStamp.string(from: now)

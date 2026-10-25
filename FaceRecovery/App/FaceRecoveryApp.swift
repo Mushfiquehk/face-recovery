@@ -5,6 +5,8 @@ import SwiftData
 struct FaceRecoveryApp: App {
     init() {
         PinStore.reconcile()
+        PhotoStore.protectExistingPhotos()
+        ExportBuilder.removeLeftoverExports()
     }
 
     var body: some Scene {

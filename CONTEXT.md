@@ -138,3 +138,11 @@ A statement the app derives arithmetically from stored Signals, Contributions an
 such as a deviation from Personal Baseline or a trend over a window. Insights describe what was
 observed and never assert a physiological cause or give health advice.
 _Avoid_: recommendation, advice, analysis, coaching
+
+### Sharing
+
+**Family Update**:
+A short first-person text about today (the Daily Sleep Prediction and chosen Journal Entry
+answers) that the user's own Shortcuts automation sends to family or a friend. Off until turned
+on; never includes photos or notes (ADR 0006).
+_Avoid_: report, alert, notification, share

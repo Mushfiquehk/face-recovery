@@ -113,8 +113,9 @@ enum JournalFactor: String, CaseIterable, Identifiable {
 }
 
 /// The user's own account of one day: Perceived Recovery, sleep, medicines and anything else
-/// they note. At most one per day, matched to that day's Face Scans by `dayStart`. Never sent
-/// anywhere and never part of the Sleep Prediction.
+/// they note. At most one per day, matched to that day's Face Scans by `dayStart`. Never part of
+/// the Sleep Prediction, and never sent anywhere except in a Family Update the user turned on,
+/// which leaves out the notes (ADR 0006).
 @Model
 final class JournalEntry {
     /// Local start of the day this entry describes, the same key as `FaceScan.dayStart`.

@@ -59,6 +59,7 @@ struct DayDetailView: View {
                 Section("Why this number") {
                     ContributionsView(prediction: prediction, selected: $selected)
                         .padding(.vertical, 4)
+                    SignalBreakdownLink(scan: canonical, prediction: prediction)
                 }
             }
 

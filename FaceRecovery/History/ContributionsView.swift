@@ -56,19 +56,25 @@ struct ContributionsView: View {
     }
 }
 
+/// How a Contribution reads wherever it is shown, so the summary and the breakdown never disagree.
+extension Contribution {
+    var roundedPoints: Int { Int(points.rounded()) }
+    var colour: Color { roundedPoints > 0 ? .green : roundedPoints < 0 ? .orange : .secondary }
+    var pointsText: String { roundedPoints > 0 ? "+\(roundedPoints)" : roundedPoints < 0 ? "−\(-roundedPoints)" : "0" }
+
+    var summary: String {
+        guard !isSteady else { return "About the same as usual" }
+        return words.prefix(1).uppercased() + words.dropFirst() + " than usual"
+    }
+}
+
 private struct ContributionRow: View {
     let contribution: Contribution
     let isSelected: Bool
 
-    private var rounded: Int { Int(contribution.points.rounded()) }
-    private var colour: Color { rounded > 0 ? .green : rounded < 0 ? .orange : .secondary }
-    private var pointsText: String { rounded > 0 ? "+\(rounded)" : rounded < 0 ? "−\(-rounded)" : "0" }
-
-    private var description: String {
-        guard !contribution.isSteady else { return "About the same as usual" }
-        let words = contribution.words
-        return words.prefix(1).uppercased() + words.dropFirst() + " than usual"
-    }
+    private var colour: Color { contribution.colour }
+    private var pointsText: String { contribution.pointsText }
+    private var description: String { contribution.summary }
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -110,7 +116,7 @@ struct RegionPhoto: View {
                 .overlay {
                     if let highlighted, let regions = scan.measurement?.measurement?.regions {
                         GeometryReader { geometry in
-                            outline(Self.regionKeys(for: highlighted).compactMap { regions[$0] }, in: geometry.size)
+                            Self.outline(Self.regionKeys(for: highlighted).compactMap { regions[$0] }, in: geometry.size)
                                 .stroke(.yellow, style: StrokeStyle(lineWidth: 3, lineJoin: .round))
                                 .shadow(color: .black.opacity(0.6), radius: 2)
                         }
@@ -121,7 +127,8 @@ struct RegionPhoto: View {
         }
     }
 
-    private func outline(_ polygons: [[[Double]]], in size: CGSize) -> Path {
+    /// Region polygons (0-1, origin top-left) drawn at `size`.
+    static func outline(_ polygons: [[[Double]]], in size: CGSize) -> Path {
         Path { path in
             for polygon in polygons {
                 guard let first = polygon.first, first.count == 2 else { continue }

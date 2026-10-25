@@ -23,20 +23,22 @@ struct ScanResultView: View {
                 ))
 
                 if let prediction, !prediction.isBaselineForming {
-                    card(title: "Why this number") {
+                    TitledCard(title: "Why this number") {
                         RegionPhoto(scan: scan, highlighted: selected)
                             .frame(maxHeight: 320)
                         ContributionsView(prediction: prediction, selected: $selected)
+                        SignalBreakdownLink(scan: scan, prediction: prediction)
+                            .buttonStyle(.bordered)
                     }
                 }
 
                 if let measurement = scan.measurement {
-                    card(title: "Photo check") {
+                    TitledCard(title: "Photo check") {
                         PhotoCheckView(measurement: measurement)
                     }
                 }
 
-                card(title: "Journal") {
+                TitledCard(title: "Journal") {
                     JournalPanel(dayStart: scan.dayStart)
                 }
 
@@ -125,17 +127,20 @@ struct ScanResultView: View {
         }
         return "Predicted WHOOP sleep performance, from your face. Your average night is \(average)."
     }
+}
 
-    private func card<Content: View>(
-        title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
+/// A rounded card with a small capitalised title, on a grouped background.
+struct TitledCard<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(title.uppercased())
                 .font(.callout.weight(.semibold))
                 .tracking(1.2)
                 .foregroundStyle(.secondary)
-            content()
+            content
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -13,14 +13,16 @@ struct ScanResultView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                hero
-                    .padding(.top, 8)
+                PredictionHeader(scan: scan, prediction: prediction)
 
-                AudioReportButton(sentences: DailyReport.sentences(
-                    dayStart: scan.dayStart,
-                    isMeasured: scan.isMeasured,
-                    prediction: prediction
-                ))
+                DayActions(dayStart: scan.dayStart, scan: scan, prediction: prediction)
+
+                // An Unusable Scan is explained by its photo check, so that comes first.
+                if let measurement = scan.measurement, !measurement.isUsable {
+                    TitledCard(title: "Photo check") {
+                        PhotoCheckView(measurement: measurement)
+                    }
+                }
 
                 if let prediction, !prediction.isBaselineForming {
                     TitledCard(title: "Why this number") {
@@ -32,18 +34,18 @@ struct ScanResultView: View {
                     }
                 }
 
-                if let measurement = scan.measurement {
+                TitledCard(title: "Journal") {
+                    JournalPanel(dayStart: scan.dayStart)
+                }
+
+                if let measurement = scan.measurement, measurement.isUsable {
                     TitledCard(title: "Photo check") {
                         PhotoCheckView(measurement: measurement)
                     }
                 }
 
-                TitledCard(title: "Journal") {
-                    JournalPanel(dayStart: scan.dayStart)
-                }
-
                 Button(action: onTakeAnother) {
-                    Text("Take another")
+                    Label("Take another photo", systemImage: "camera")
                         .font(.title3)
                         .frame(maxWidth: .infinity, minHeight: 56)
                 }
@@ -54,92 +56,50 @@ struct ScanResultView: View {
         }
         .background(Color(.systemGroupedBackground))
     }
+}
 
-    // MARK: Hero
+/// Listen and Share, side by side under a day's header, and stacked when large text leaves no
+/// room. Share is left out while there is no real reading to share.
+struct DayActions: View {
+    let dayStart: Date
+    let scan: FaceScan
+    let prediction: SleepPrediction?
 
-    private var hero: some View {
-        VStack(spacing: 14) {
-            ZStack {
-                PredictionRing(value: prediction?.value, color: band?.color ?? .secondary)
-                    .frame(width: 210, height: 210)
-
-                VStack(spacing: 2) {
-                    Text(prediction.map { "\($0.value)" } ?? "—")
-                        .font(.system(size: 64, weight: .bold, design: .rounded).monospacedDigit())
-                        .contentTransition(.numericText())
-                    Text("SLEEP")
-                        .font(.caption.weight(.semibold))
-                        .tracking(1.5)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(prediction.map { "Sleep Prediction \($0.value)" } ?? "No Sleep Prediction")
-
-            VStack(spacing: 6) {
-                Text(headline)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(band?.color ?? .primary)
-                    .multilineTextAlignment(.center)
-                Text(caption)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.horizontal)
-
-            if prediction?.isBaselineForming ?? true, let image = PhotoStore.load(scan.photoFilename) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 72, height: 72)
-                    .clipShape(Circle())
-                    .accessibilityHidden(true)
-            }
-            Text(scan.capturedAt.formatted(date: .abbreviated, time: .shortened))
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
-    }
-
-    private var band: SleepBand? {
+    private var shareable: SleepPrediction? {
         guard let prediction, !prediction.isBaselineForming else { return nil }
-        return SleepBand(value: prediction.value)
+        return prediction
     }
 
-    private var headline: String {
-        guard let prediction else { return "This photo did not count" }
-        return prediction.isBaselineForming ? "Learning your usual face" : SleepBand(value: prediction.value).label
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) { buttons }
+            VStack(spacing: 12) { buttons }
+        }
     }
 
-    private var caption: String {
-        guard let prediction else {
-            return "See the photo check below for what to change. Your photo is kept."
+    @ViewBuilder
+    private var buttons: some View {
+        AudioReportButton(sentences: DailyReport.sentences(
+            dayStart: dayStart,
+            isMeasured: scan.isMeasured,
+            prediction: prediction
+        ))
+        if let shareable {
+            ShareResultButton(dayStart: dayStart, scan: scan, prediction: shareable)
         }
-        let average = Int(prediction.startingValue.rounded())
-        if prediction.isBaselineForming {
-            let needed = ScoreTuning.default.minimumScansForBaseline
-            let have = prediction.baseline.sampleCount
-            return "Your average night is \(average). After \(needed) clear morning scans (you have \(have)), each photo is compared with your usual face. Until then this shows your average."
-        }
-        return "Predicted WHOOP sleep performance, from your face. Your average night is \(average)."
     }
 }
 
-/// A rounded card with a small capitalised title, on a grouped background.
+/// A rounded card with a heading, on a grouped background.
 struct TitledCard<Content: View>: View {
     let title: String
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(title.uppercased())
-                .font(.callout.weight(.semibold))
-                .tracking(1.2)
-                .foregroundStyle(.secondary)
+            Text(title)
+                .font(.title3.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
             content
         }
         .padding()

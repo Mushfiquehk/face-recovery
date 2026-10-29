@@ -35,7 +35,7 @@ struct PinPad: View {
                 // Always present so the keys do not jump when a message appears.
                 Text(message ?? " ")
                     .font(.title3)
-                    .foregroundStyle(messageIsError ? Color.red : Color.secondary)
+                    .foregroundStyle(messageIsError ? Palette.low : Color.secondary)
                     .multilineTextAlignment(.center)
                     .frame(minHeight: 56, alignment: .top)
 

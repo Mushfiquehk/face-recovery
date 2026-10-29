@@ -12,7 +12,7 @@ struct AudioReportButton: View {
             player.toggle(sentences)
         } label: {
             Label(
-                player.isSpeaking ? "Stop the report" : "Listen to this day's report",
+                player.isSpeaking ? "Stop" : "Listen",
                 systemImage: player.isSpeaking ? "stop.circle.fill" : "speaker.wave.2.fill"
             )
             .font(.headline)
@@ -20,6 +20,7 @@ struct AudioReportButton: View {
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
+        .accessibilityLabel(player.isSpeaking ? "Stop the report" : "Listen to this day's report")
         .accessibilityHint("Reads this day's score aloud")
         .onDisappear { player.stop() }
     }

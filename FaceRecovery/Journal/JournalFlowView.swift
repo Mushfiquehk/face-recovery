@@ -143,13 +143,13 @@ struct JournalFlowView: View {
         if isBlindToScore && position == 0 {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Palette.good)
                 Text("Photo saved. Your score comes next.")
             }
             .font(.headline)
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+            .background(Palette.good.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
         }
 
         if !isToday {

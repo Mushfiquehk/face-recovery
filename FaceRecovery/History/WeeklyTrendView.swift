@@ -97,6 +97,8 @@ private enum WeekStyle {
 private struct WeekKey: View {
     let weeks: ScoreWeeks
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             entry(weeks.thisWeek, style: .thisWeek)
@@ -125,11 +127,19 @@ private struct WeekKey: View {
                 Text((week.start..<week.end).formatted(.interval.month(.abbreviated).day()))
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                // At the largest sizes there is no room for a second column, so the average
+                // goes under the dates instead of breaking mid-word on the right.
+                if dynamicTypeSize.isAccessibilitySize {
+                    Text(week.average.map { "Average \($0)" } ?? "No scores")
+                        .font(.callout.weight(.semibold))
+                }
             }
 
             Spacer()
 
-            if let average = week.average {
+            if dynamicTypeSize.isAccessibilitySize {
+                EmptyView()
+            } else if let average = week.average {
                 VStack(alignment: .trailing, spacing: 1) {
                     Text("\(average)")
                         .font(.title2.weight(.bold).monospacedDigit())
@@ -219,14 +229,11 @@ private struct CombinedWeekChart: View {
                 .foregroundStyle(zone.color.opacity(0.12))
             }
 
+            // Named in the legend below rather than on the chart, where a day's number could
+            // land on top of the words.
             RuleMark(y: .value("Normal", normal))
                 .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
                 .foregroundStyle(Color.secondary)
-                .annotation(position: .top, alignment: .trailing, spacing: 2) {
-                    Text("Your normal")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
 
             // Last week first so this week is drawn on top of it where they cross.
             marks(for: weeks.lastWeek, style: .lastWeek, label: .bottom)
@@ -313,7 +320,7 @@ private struct BandLegend: View {
                         .font(.callout)
                 }
             }
-            Text("The dotted line is your average night, \(Int(SleepModel.bundled.startingValue.rounded())). A line that sits higher means a better-slept week.")
+            Text("The dashed line is your average night, \(Int(SleepModel.bundled.startingValue.rounded())). A line that sits higher means a better-slept week.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

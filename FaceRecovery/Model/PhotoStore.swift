@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 import UIKit
 
 /// Face Scan photos live on disk, not in SwiftData: a store of base64 blobs would make every
@@ -57,5 +58,25 @@ enum PhotoStore {
 
     static func load(_ filename: String) -> UIImage? {
         UIImage(contentsOfFile: url(for: filename).path)
+    }
+
+    private static let thumbnails = NSCache<NSString, UIImage>()
+
+    /// A small copy for lists and cards, decoded at the size it is shown rather than at the
+    /// camera's full resolution, so History scrolls smoothly. Kept in memory only, never on disk.
+    static func thumbnail(_ filename: String, maxPixelSize: Int = 240) -> UIImage? {
+        let key = "\(filename)@\(maxPixelSize)" as NSString
+        if let cached = thumbnails.object(forKey: key) { return cached }
+        let options = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+        ] as CFDictionary
+        guard let source = CGImageSourceCreateWithURL(url(for: filename) as CFURL, nil),
+              let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options)
+        else { return nil }
+        let image = UIImage(cgImage: cgImage)
+        thumbnails.setObject(image, forKey: key)
+        return image
     }
 }

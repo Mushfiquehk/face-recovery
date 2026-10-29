@@ -59,7 +59,7 @@ struct ContributionsView: View {
 /// How a Contribution reads wherever it is shown, so the summary and the breakdown never disagree.
 extension Contribution {
     var roundedPoints: Int { Int(points.rounded()) }
-    var colour: Color { roundedPoints > 0 ? .green : roundedPoints < 0 ? .orange : .secondary }
+    var colour: Color { roundedPoints > 0 ? Palette.good : roundedPoints < 0 ? Palette.caution : .secondary }
     var pointsText: String { roundedPoints > 0 ? "+\(roundedPoints)" : roundedPoints < 0 ? "−\(-roundedPoints)" : "0" }
 
     var summary: String {
@@ -170,13 +170,13 @@ struct PhotoCheckView: View {
             if measurement.isUsable {
                 Label("Clear photo", systemImage: "checkmark.circle.fill")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Palette.good)
                 Text("Good light, facing the camera, no glasses.")
                     .font(.body)
             } else {
                 Label("This photo did not count", systemImage: "exclamationmark.triangle.fill")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Palette.caution)
                 ForEach(measurement.problems, id: \.self) { problem in
                     Text("• \(problem)").font(.body)
                 }
@@ -219,9 +219,9 @@ enum SleepBand {
 
     var color: Color {
         switch self {
-        case .optimal: .green
-        case .sufficient: .yellow
-        case .poor: .red
+        case .optimal: Palette.good
+        case .sufficient: Palette.fair
+        case .poor: Palette.low
         }
     }
 

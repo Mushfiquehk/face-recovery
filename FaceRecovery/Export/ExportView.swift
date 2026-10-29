@@ -27,14 +27,19 @@ struct ExportView: View {
                 Section {
                     Button { share() } label: {
                         Label("Share export", systemImage: "square.and.arrow.up")
+                            .font(.title3.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 56)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                     .disabled(isSharing)
 
                     if let statusMessage {
-                        Text(statusMessage).font(.caption).foregroundStyle(.secondary)
+                        Text(statusMessage).font(.callout).foregroundStyle(.secondary)
                     }
                     if let errorMessage {
-                        Text(errorMessage).font(.caption).foregroundStyle(.red)
+                        Text(errorMessage).font(.callout).foregroundStyle(Palette.low)
                     }
                 } footer: {
                     Text("Writes scans.json with every measurement, photo check and Journal Entry, plus the photo files. Sleep Predictions and baselines are not exported — the pipeline recomputes them so the app and the analysis can never disagree. The export holds your photos and medicines unprotected, so send it only somewhere you trust. The copy made for sharing is deleted from this phone as soon as the share sheet closes.")
@@ -46,7 +51,8 @@ struct ExportView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Export")
+            .navigationTitle("Export all data")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

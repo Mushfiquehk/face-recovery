@@ -41,10 +41,15 @@ struct BackfillView: View {
                         matching: .images,
                         photoLibrary: .shared()
                     ) {
-                        Label("Choose photos", systemImage: "photo.on.rectangle")
+                        Label(candidates.isEmpty ? "Choose photos" : "Choose different photos", systemImage: "photo.on.rectangle")
+                            .font(.title3.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 56)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                 } footer: {
-                    Text("Each photo's own capture date is used. Editing a date marks that scan Date-Adjusted, which permanently excludes it from research exports.")
+                    Text("Morning photos of your face, up to 30 at a time. Each photo's own date is used. Changing a date marks that scan Date-Adjusted, which keeps it out of research exports.")
                 }
 
                 if isLoading {
@@ -57,20 +62,25 @@ struct BackfillView: View {
 
                 if let progress {
                     Section("Progress") {
-                        Text("\(progress.completed) of \(progress.total) read")
+                        ProgressView(value: Double(progress.completed), total: Double(max(progress.total, 1))) {
+                            Text(progress.completed == progress.total
+                                 ? "All \(progress.total) read. Tap Done."
+                                 : "\(progress.completed) of \(progress.total) read")
+                        }
                         ForEach(progress.failures, id: \.self) { failure in
-                            Text(failure).font(.caption).foregroundStyle(.red)
+                            Text(failure).font(.callout).foregroundStyle(Palette.low)
                         }
                     }
                 }
             }
-            .navigationTitle("Backfill")
+            .navigationTitle("Add past photos")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Scan \(candidates.count)") {
+                    Button(candidates.isEmpty ? "Add" : "Add \(candidates.count)") {
                         Task { await scanAll() }
                     }
                     .disabled(candidates.isEmpty || progress != nil)
@@ -114,12 +124,12 @@ struct BackfillView: View {
                             : "Date-Adjusted",
                         systemImage: "exclamationmark.triangle"
                     )
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.caution)
                 }
 
                 if let outcome = candidate.wrappedValue.outcome {
-                    Text(outcome).font(.caption2).foregroundStyle(.secondary)
+                    Text(outcome).font(.footnote).foregroundStyle(.secondary)
                 }
             }
         }

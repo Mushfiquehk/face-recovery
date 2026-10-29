@@ -9,6 +9,8 @@ struct CaptureView: View {
     /// The day the journal was last asked for, so a retake that day does not ask again, even
     /// if the user chose "Not now".
     @State private var journalAskedOn: Date?
+    /// True from the shutter tap until the photo is stored, so a second tap cannot take two.
+    @State private var isCapturing = false
 
     private struct JournalPrompt: Identifiable {
         let dayStart: Date
@@ -62,9 +64,13 @@ struct CaptureView: View {
                 Button(action: { Task { await takeScan() } }) {
                     Circle()
                         .fill(.white)
-                        .frame(width: 72, height: 72)
+                        .frame(width: 76, height: 76)
                         .overlay(Circle().stroke(.white.opacity(0.6), lineWidth: 4).padding(-6))
+                        .scaleEffect(isCapturing ? 0.88 : 1)
+                        .animation(.spring(duration: 0.25), value: isCapturing)
                 }
+                .disabled(isCapturing)
+                .sensoryFeedback(.impact(weight: .medium), trigger: isCapturing) { _, new in new }
                 .padding(.bottom, 28)
                 .accessibilityLabel("Take face scan")
             }
@@ -108,7 +114,7 @@ struct CaptureView: View {
 
                 Text("Your photo is saved. Nothing is lost.")
                     .font(.title3.weight(.medium))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Palette.good)
                     .multilineTextAlignment(.center)
 
                 Button {
@@ -153,6 +159,8 @@ struct CaptureView: View {
     }
 
     private func takeScan() async {
+        isCapturing = true
+        defer { isCapturing = false }
         do {
             let image = try await camera.capture()
             let service = ScoringService(modelContext: modelContext)

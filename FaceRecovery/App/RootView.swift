@@ -10,13 +10,13 @@ struct RootView: View {
 
     var body: some View {
         TabView {
-            Tab("History", systemImage: "list.bullet") {
+            Tab("History", systemImage: "calendar") {
                 HistoryListView()
             }
-            Tab("Scan", systemImage: "camera") {
+            Tab("Scan", systemImage: "camera.viewfinder") {
                 CaptureView()
             }
-            Tab("Settings", systemImage: "gear") {
+            Tab("Settings", systemImage: "gearshape") {
                 SettingsView()
             }
         }

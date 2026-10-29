@@ -18,6 +18,7 @@ This project includes:
 - [`CONTEXT.md`](./CONTEXT.md) is the glossary. Use its terms exactly.
 - [`docs/adr/`](./docs/adr) records why the non-obvious choices were made.
 - [`docs/implementation-plan.md`](./docs/implementation-plan.md) is the v1 build plan.
+- [`docs/DESIGN.md`](./docs/DESIGN.md) is the UI design system every screen follows.
 
 ## Configuration
 

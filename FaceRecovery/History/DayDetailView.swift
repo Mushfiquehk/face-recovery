@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 
+/// One day from History, laid out like the scan result so a day reads the same way however it
+/// was opened: the header, Listen and Share, why the number is what it is, the journal, then the
+/// photo check and the other scans of the day.
 struct DayDetailView: View {
     @Environment(\.modelContext) private var modelContext
     let day: DayEntry
@@ -12,139 +15,148 @@ struct DayDetailView: View {
     private var canonical: FaceScan { day.canonical }
 
     var body: some View {
-        List {
-            Section {
-                RegionPhoto(scan: canonical, highlighted: selected)
-                LabeledContent("Captured", value: canonical.capturedAt.formatted(date: .abbreviated, time: .shortened))
-            }
+        ScrollView {
+            VStack(spacing: 16) {
+                PredictionHeader(scan: canonical, prediction: day.dailyPrediction)
 
-            Section("Daily Sleep Prediction") {
-                if let prediction = day.dailyPrediction {
-                    HStack(alignment: .firstTextBaseline, spacing: 14) {
-                        Text("\(prediction.value)")
-                            .font(.system(size: 44, weight: .semibold).monospacedDigit())
-                        VStack(alignment: .leading, spacing: 4) {
-                            if prediction.isBaselineForming {
-                                Text("Learning your usual face").font(.body.weight(.semibold))
-                                Text("Fewer than \(ScoreTuning.default.minimumScansForBaseline) clear morning scans so far, so this is your average night rather than a reading of this photo.")
-                                    .font(.callout)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text(SleepBand(value: prediction.value).label)
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(SleepBand(value: prediction.value).color)
-                                Text("Predicted WHOOP sleep performance. Your average night is \(Int(prediction.startingValue.rounded())).")
-                                    .font(.callout)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                } else if canonical.isMeasured {
-                    Text("No prediction: this photo did not count, so it is left out of the trend and of your usual face.")
-                        .foregroundStyle(.secondary)
+                if canonical.isMeasured {
+                    DayActions(dayStart: day.dayStart, scan: canonical, prediction: day.dailyPrediction)
                 } else {
-                    Text("Not read yet.").foregroundStyle(.secondary)
-                }
-            }
-
-            Section {
-                AudioReportButton(sentences: DailyReport.sentences(
-                    dayStart: day.dayStart,
-                    isMeasured: canonical.isMeasured,
-                    prediction: day.dailyPrediction
-                ))
-            }
-
-            if let prediction = day.dailyPrediction, !prediction.isBaselineForming {
-                Section("Why this number") {
-                    ContributionsView(prediction: prediction, selected: $selected)
-                        .padding(.vertical, 4)
-                    SignalBreakdownLink(scan: canonical, prediction: prediction)
-                }
-            }
-
-            Section("Journal") {
-                JournalPanel(dayStart: day.dayStart)
-            }
-
-            if let measurement = canonical.measurement {
-                Section("Photo check") {
-                    PhotoCheckView(measurement: measurement)
+                    readButton
                 }
 
-                Section {
-                    LabeledContent("Measurement", value: measurement.version)
-                    LabeledContent("Measured", value: measurement.measuredAt.formatted(date: .abbreviated, time: .shortened))
-                    if let prediction = day.dailyPrediction {
-                        LabeledContent("Sleep Model", value: prediction.modelVersion)
+                if let measurement = canonical.measurement, !measurement.isUsable {
+                    TitledCard(title: "Photo check") {
+                        PhotoCheckView(measurement: measurement)
                     }
-                } header: {
-                    Text("How it was read")
-                } footer: {
-                    Text("Measured on this phone; the photo never left it.")
                 }
-                .font(.footnote)
-            }
 
-            Section {
-                if !canonical.isMeasured {
-                    Button("Read this scan") { measure(canonical) }
-                        .disabled(measuringID != nil)
-                }
-                if let errorMessage {
-                    Text(errorMessage).font(.caption).foregroundStyle(.red)
-                }
-            }
-
-            if day.hasMultipleScans {
-                Section {
-                    ForEach(day.allScans, id: \.id) { scan in
-                        scanRow(scan)
+                if let prediction = day.dailyPrediction, !prediction.isBaselineForming {
+                    TitledCard(title: "Why this number") {
+                        RegionPhoto(scan: canonical, highlighted: selected)
+                            .frame(maxHeight: 320)
+                        ContributionsView(prediction: prediction, selected: $selected)
+                        SignalBreakdownLink(scan: canonical, prediction: prediction)
+                            .buttonStyle(.bordered)
                     }
-                } header: {
-                    Text("All scans this day")
-                } footer: {
-                    Text("The Canonical Scan is the one whose Sleep Prediction represents this day. It defaults to the earliest scan; re-designating another is recorded.")
+                } else {
+                    RegionPhoto(scan: canonical, highlighted: nil)
+                        .frame(maxHeight: 320)
                 }
+
+                TitledCard(title: "Journal") {
+                    JournalPanel(dayStart: day.dayStart)
+                }
+
+                if let measurement = canonical.measurement, measurement.isUsable {
+                    TitledCard(title: "Photo check") {
+                        PhotoCheckView(measurement: measurement)
+                    }
+                }
+
+                if day.hasMultipleScans {
+                    TitledCard(title: "All scans this day") {
+                        ForEach(day.allScans, id: \.id) { scan in
+                            if scan.id != day.allScans.first?.id { Divider() }
+                            scanRow(scan)
+                        }
+                        if canonical.isMeasured, let errorMessage {
+                            Text(errorMessage).font(.callout).foregroundStyle(Palette.low)
+                        }
+                        Text("One scan counts for each day. It starts as the earliest; switching to another is recorded.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                if let measurement = canonical.measurement {
+                    provenance(measurement)
+                }
+            }
+            .padding()
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle(day.dayStart.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var readButton: some View {
+        VStack(spacing: 8) {
+            Button {
+                measure(canonical)
+            } label: {
+                Group {
+                    if measuringID != nil {
+                        ProgressView()
+                    } else {
+                        Label("Read this scan", systemImage: "wand.and.stars")
+                    }
+                }
+                .font(.title3.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 56)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(measuringID != nil)
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.callout)
+                    .foregroundStyle(Palette.low)
             }
         }
-        .navigationTitle(day.dayStart.formatted(date: .abbreviated, time: .omitted))
-        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// Versions, small and last: there to be checked, not read every day.
+    private func provenance(_ measurement: ScanMeasurement) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Measured on this phone; the photo never left it.")
+            Text("Measurement \(measurement.version), \(measurement.measuredAt.formatted(date: .abbreviated, time: .shortened))")
+            if let prediction = day.dailyPrediction {
+                Text("Sleep Model \(prediction.modelVersion)")
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
     }
 
     private func scanRow(_ scan: FaceScan) -> some View {
         HStack(spacing: 12) {
-            if let image = PhotoStore.load(scan.photoFilename) {
+            if let image = PhotoStore.thumbnail(scan.photoFilename) {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .frame(width: 52, height: 52)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .accessibilityHidden(true)
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(scan.capturedAt.formatted(date: .omitted, time: .shortened))
+                    .font(.body.weight(.semibold))
                 if scan.isCanonical {
                     Label(
-                        scan.canonicalDesignatedAt == nil ? "Canonical (earliest)" : "Canonical (chosen)",
+                        scan.canonicalDesignatedAt == nil ? "Counts for this day (earliest)" : "Counts for this day",
                         systemImage: "checkmark.seal.fill"
                     )
-                    .font(.caption2)
+                    .font(.callout)
                     .foregroundStyle(.tint)
                 }
                 if !scan.isUsable && scan.isMeasured {
-                    Text("Did not count").font(.caption2).foregroundStyle(.orange)
+                    Text("Did not count").font(.callout).foregroundStyle(Palette.caution)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
             if !scan.isCanonical {
-                Button("Make canonical") { makeCanonical(scan) }
-                    .font(.caption)
+                Button("Count this one") { makeCanonical(scan) }
                     .buttonStyle(.bordered)
             }
         }
+        .frame(minHeight: 56)
     }
 
     private func makeCanonical(_ scan: FaceScan) {

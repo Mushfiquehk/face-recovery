@@ -146,3 +146,9 @@ A short first-person text about today (the Daily Sleep Prediction and chosen Jou
 answers) that the user's own Shortcuts automation sends to family or a friend. Off until turned
 on; never includes photos or notes (ADR 0006).
 _Avoid_: report, alert, notification, share
+
+**Result Card**:
+A picture of one day's Daily Sleep Prediction, its band and its largest Contributions, which the
+user sends or posts themselves through the iPhone share sheet. Only for a real reading, never while
+Baseline Forming; the photo only when the user includes it; never Journal answers (ADR 0008).
+_Avoid_: post, screenshot, share image, story
